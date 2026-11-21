@@ -1,0 +1,512 @@
+/* Scoped Ads Studio screen styles layered cleanly over @cadence/screen-ui */
+
+.app-outlet.ads {
+  padding: 0;
+  background: transparent;
+  container-type: inline-size;
+  gap: 20px;
+}
+
+.ads-row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.ads-title-stack {
+  display: grid;
+  gap: 3px;
+}
+
+.ads-title-stack h2,
+.ads-title-stack h3 {
+  margin: 0;
+  color: var(--color-ink-100);
+}
+
+.ads-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.ads-search-wrap {
+  flex: 1 1 220px;
+  min-width: 170px;
+}
+
+.ads-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ads-chip {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-ink-700);
+  background: transparent;
+  color: var(--color-ink-400);
+  font-size: var(--text-label);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ads-chip:hover {
+  background: var(--color-ink-850);
+  color: var(--color-ink-100);
+}
+
+.ads-chip[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-ink-100);
+  font-weight: 500;
+}
+
+.ads-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex: none;
+}
+
+.ads-dot-meta {
+  background: var(--color-info);
+}
+
+.ads-dot-google {
+  background: var(--color-ok);
+}
+
+/* KPI Grid — borderless .card per CAD-2537, container-responsive */
+.ads-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.ads-card {
+  background: var(--color-ink-850);
+  border-radius: 0.5rem;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+:root[data-theme="light"] .ads-card {
+  background: var(--color-ink-800);
+}
+
+.ads-kpi-card {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ads-kpi-label {
+  font-size: var(--text-label);
+  color: var(--color-ink-500);
+}
+
+.ads-kpi-value {
+  font-size: 1.45rem;
+  font-weight: 600;
+  color: var(--color-ink-100);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.ads-kpi-sub {
+  font-size: var(--text-micro);
+  color: var(--color-ink-400);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.ads-split-list {
+  display: grid;
+  gap: 6px;
+}
+
+.ads-split-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--text-secondary);
+  color: var(--color-ink-200);
+}
+
+.ads-split-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* 7-day pacing chart with Y-axis + guardrail reference */
+.ads-chart-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  flex: 1;
+  min-height: 162px;
+  padding-top: 6px;
+}
+
+.ads-chart-yaxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 118px;
+  font: 400 var(--text-micro)/1 var(--font-mono);
+  color: var(--color-ink-500);
+  text-align: right;
+}
+
+.ads-chart-plot {
+  position: relative;
+  height: 140px;
+}
+
+.ads-guide-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--color-warn) 58%, transparent);
+  pointer-events: none;
+}
+
+.ads-guide-mid {
+  position: absolute;
+  top: 59px;
+  left: 0;
+  right: 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-ink-700) 65%, transparent);
+  pointer-events: none;
+}
+
+.ads-bars {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  height: 140px;
+}
+
+.ads-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+
+.ads-bar-stack {
+  width: 100%;
+  max-width: 34px;
+  height: 118px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+  border-bottom: 1px solid var(--color-ink-700);
+  padding-bottom: 1px;
+}
+
+.ads-bar-total {
+  font: 500 10px/1 var(--font-mono);
+  color: var(--color-ink-400);
+  margin-bottom: 3px;
+  white-space: nowrap;
+}
+
+.ads-bar-google {
+  width: 100%;
+  background: var(--color-ok);
+  border-radius: 2px 2px 0 0;
+  opacity: 0.88;
+  min-height: 2px;
+}
+
+.ads-bar-meta {
+  width: 100%;
+  background: var(--color-info);
+  border-radius: 0 0 2px 2px;
+  opacity: 0.88;
+  min-height: 2px;
+}
+
+.ads-bar-day {
+  font: 500 var(--text-micro)/1 var(--font-mono);
+  color: var(--color-ink-500);
+}
+
+.ads-audit-list {
+  display: grid;
+  gap: 11px;
+}
+
+.ads-audit-item {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-ink-700);
+  font-size: var(--text-label);
+}
+
+.ads-audit-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.ads-table {
+  min-width: 600px;
+}
+
+.ads-canvas .ads-campaigns-table {
+  min-width: 480px;
+}
+
+.ads-canvas .ads-campaigns-table th:nth-child(6),
+.ads-canvas .ads-campaigns-table td:nth-child(6) {
+  display: none;
+}
+
+.ads-num-col {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ads-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-label);
+  line-height: 1.25;
+  font-weight: 500;
+  padding: 0.16rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-edge);
+  color: var(--color-ink-200);
+  background: color-mix(in srgb, var(--color-ink-100) 6%, transparent);
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+.ads-pill[data-tone="ok"] {
+  color: color-mix(in srgb, var(--color-ok) 82%, var(--color-ink-100));
+  border-color: color-mix(in srgb, var(--color-ok) 35%, transparent);
+  background: color-mix(in srgb, var(--color-ok) 10%, transparent);
+}
+
+.ads-pill[data-tone="warn"] {
+  color: var(--color-warn);
+  border-color: color-mix(in srgb, var(--color-warn) 38%, transparent);
+  background: color-mix(in srgb, var(--color-warn) 10%, transparent);
+}
+
+.ads-pill[data-tone="fail"] {
+  color: var(--color-fail);
+  border-color: color-mix(in srgb, var(--color-fail) 35%, transparent);
+  background: color-mix(in srgb, var(--color-fail) 10%, transparent);
+}
+
+.ads-pill[data-tone="info"] {
+  color: color-mix(in srgb, var(--color-info) 82%, var(--color-ink-100));
+  border-color: color-mix(in srgb, var(--color-info) 35%, transparent);
+  background: color-mix(in srgb, var(--color-info) 10%, transparent);
+}
+
+.ads-pill[data-tone="accent"] {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.ads-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding: 14px 18px;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--color-warn) 40%, var(--color-ink-700));
+  background: color-mix(in srgb, var(--color-warn) 8%, var(--color-ink-850));
+}
+
+.ads-banner[data-tone="info"] {
+  border-color: color-mix(in srgb, var(--color-info) 40%, var(--color-ink-700));
+  background: color-mix(in srgb, var(--color-info) 8%, var(--color-ink-850));
+}
+
+.ads-banner-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.ads-banner-body strong {
+  font-size: var(--text-secondary);
+  color: var(--color-ink-100);
+}
+
+.ads-banner-body p {
+  margin: 0;
+  font-size: var(--text-label);
+  color: var(--color-ink-300);
+}
+
+.ads-cpa-warn {
+  color: var(--color-warn);
+  font-weight: 600;
+}
+
+.ads-diff-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-ink-700);
+  background: var(--color-ink-875);
+  font-size: var(--text-label);
+}
+
+:root[data-theme="light"] .ads-diff-strip,
+:root[data-theme="light"] .ads-inset {
+  background: var(--color-ink-850);
+  border: 1px solid var(--color-ink-700);
+}
+
+.ads-asset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ads-asset-btn {
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  color: inherit;
+  padding: 14px;
+}
+
+.ads-asset-btn:hover {
+  background: var(--color-ink-800);
+}
+
+:root[data-theme="light"] .ads-asset-btn:hover {
+  background: var(--color-ink-700);
+}
+
+.ads-asset-stage {
+  position: relative;
+  height: 108px;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-ink-700);
+  background: var(--color-ink-875);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.ads-creative-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.ads-inset {
+  border: 1px solid var(--color-ink-700);
+  border-radius: 0.375rem;
+  background: var(--color-ink-875);
+  padding: 12px 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.ads-drawer-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ads-drawer-kpi {
+  padding: 10px 12px;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-ink-700);
+  background: var(--color-ink-850);
+  display: grid;
+  gap: 4px;
+}
+
+.ads-route-params {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: var(--text-micro);
+  color: var(--color-ink-400);
+}
+
+.ads-scope-tag {
+  font: 500 var(--text-micro)/1.2 var(--font-mono);
+  padding: 3px 7px;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-ink-700);
+  background: var(--color-ink-875);
+  color: var(--color-ink-300);
+}
+
+.ads-form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+@container (max-width: 860px) {
+  .ads-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ads-split-grid,
+  .ads-creative-grid {
+    grid-template-columns: 1fr;
+  }
+  .ads-asset-grid,
+  .ads-drawer-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 520px) {
+  .ads-kpi-grid,
+  .ads-asset-grid,
+  .ads-drawer-kpis {
+    grid-template-columns: 1fr;
+  }
+}

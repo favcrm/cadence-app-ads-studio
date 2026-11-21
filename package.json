@@ -1,0 +1,35 @@
+{
+  "name": "cadence-app-ads-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev-preview.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build_screen.mjs",
+    "verify": "node scripts/verify_screen.mjs",
+    "check:schema": "bun run scripts/check_host_schema.mjs",
+    "test": "bun test tests/unit/ads_domain.test.mjs tests/unit/locale_catalog.test.mjs tests/unit/storage_descriptor.test.mjs tests/contract/screen_bundle.test.mjs"
+  },
+  "cadence": {
+    "app": "ads-studio",
+    "dev": "node scripts/dev-preview.mjs"
+  },
+  "dependencies": {
+    "@cadence/app-kit": "file:app-kit",
+    "@cadence/screen-ui": "file:.cadence-ui/cadence-screen-ui-1.0.0.tgz",
+    "@hugeicons/core-free-icons": "4.3.0",
+    "@hugeicons/react": "1.1.10",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^21.0.4",
+    "@types/react": "19.2.9",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "5.9.3",
+    "vite": "8.2.2",
+    "yaml": "2.8.1"
+  }
+}
