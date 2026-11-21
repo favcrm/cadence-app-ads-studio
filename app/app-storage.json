@@ -1,0 +1,125 @@
+{
+  "contract": "app-storage/v1",
+  "app": "ads-studio",
+  "record_kind": "ad_account",
+  "schema_version": 1,
+  "compatible_schema_versions": [
+    1
+  ],
+  "default_table": "ad_accounts",
+  "migrations": [
+    {
+      "version": 1,
+      "path": "storage/001-initial.json",
+      "sha256": "sha256:c2fdc5fc8273de1601559b87c297f50b14bb3ec8b2893db625d0b6222935f013"
+    }
+  ],
+  "record_search_columns": [
+    "account_key",
+    "display_name",
+    "external_account_id"
+  ],
+  "record_write_schema": {
+    "type": "object",
+    "required": [
+      "operation",
+      "after"
+    ],
+    "properties": {
+      "after": {
+        "type": "object",
+        "required": [
+          "account_key",
+          "platform",
+          "external_account_id",
+          "display_name",
+          "daily_guardrail_minor"
+        ],
+        "properties": {
+          "account_key": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]{3,40}$"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "meta",
+              "google"
+            ]
+          },
+          "external_account_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "daily_guardrail_minor": {
+            "type": "integer",
+            "minimum": 10000
+          }
+        }
+      }
+    }
+  },
+  "tables": {
+    "ad_accounts": {
+      "read_role": "owner",
+      "immutable_columns": [
+        "account_key"
+      ]
+    },
+    "ad_campaigns": {
+      "read_role": "owner",
+      "search_columns": [
+        "name",
+        "external_campaign_id"
+      ],
+      "immutable_columns": [
+        "campaign_key"
+      ],
+      "references": [
+        {
+          "column": "account_key",
+          "table": "ad_accounts",
+          "key": "account_key"
+        }
+      ]
+    },
+    "ad_proposals": {
+      "read_role": "owner",
+      "search_columns": [
+        "campaign_key",
+        "rationale"
+      ],
+      "immutable_columns": [
+        "proposal_key"
+      ],
+      "references": [
+        {
+          "column": "account_key",
+          "table": "ad_accounts",
+          "key": "account_key"
+        }
+      ]
+    },
+    "creative_assets": {
+      "read_role": "owner",
+      "search_columns": [
+        "name",
+        "wiki_path"
+      ],
+      "immutable_columns": [
+        "asset_key"
+      ]
+    },
+    "audit_events": {
+      "read_role": "owner",
+      "append_only": true,
+      "immutable_columns": [
+        "event_key"
+      ]
+    }
+  }
+}

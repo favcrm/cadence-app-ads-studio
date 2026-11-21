@@ -1,0 +1,52 @@
+{
+  "contract": "app-chat/v1",
+  "app": "ads-studio",
+  "contexts": [
+    {
+      "id": "overview",
+      "label": "Overview",
+      "prompts": [
+        "Audit wasted spend in the last 7 days",
+        "Summarize Meta vs Google conversion split",
+        "Check daily spend pacing against guardrails"
+      ]
+    },
+    {
+      "id": "campaigns",
+      "label": "Campaigns",
+      "prompts": [
+        "Find any limited campaigns or CPA outliers above HK$180",
+        "Propose pausing campaigns above HK$180 CPA",
+        "Stage a daily budget increase for top-performing prospecting"
+      ],
+      "record": {
+        "label": "Campaign"
+      }
+    },
+    {
+      "id": "proposals",
+      "label": "Changes",
+      "prompts": [
+        "Summarize all pending spend proposals awaiting owner approval",
+        "Check whether staged budgets stay inside account guardrails"
+      ]
+    },
+    {
+      "id": "creatives",
+      "label": "Creatives",
+      "prompts": [
+        "Draft 3 zh-HK Meta creative variants",
+        "Check ad headline and description length limits for Google RSA",
+        "List creative assets in global/ads-studio/assets/ under 15 MiB"
+      ]
+    },
+    {
+      "id": "accounts",
+      "label": "Accounts",
+      "prompts": [
+        "Review configured Meta and Google daily spend guardrails",
+        "Explain Workspace Media storage caps (15 MiB hosted vs 100 MB native)"
+      ]
+    }
+  ]
+}

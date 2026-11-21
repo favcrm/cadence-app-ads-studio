@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "operations": [
+    {
+      "op": "create_table",
+      "table": "ad_accounts",
+      "columns": [
+        { "name": "account_key", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "platform", "type": "text", "nullable": false, "enum": ["meta", "google"] },
+        { "name": "external_account_id", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "login_customer_id", "type": "text", "nullable": true, "max_length": 64 },
+        { "name": "display_name", "type": "text", "nullable": false, "max_length": 120 },
+        { "name": "currency", "type": "text", "nullable": false, "max_length": 8, "default": "HKD" },
+        { "name": "timezone", "type": "text", "nullable": false, "max_length": 64, "default": "Asia/Hong_Kong" },
+        { "name": "status", "type": "text", "nullable": false, "enum": ["active", "inactive"], "default": "active" },
+        { "name": "daily_guardrail_minor", "type": "integer", "nullable": false, "default": 250000 },
+        { "name": "scopes_text", "type": "text", "nullable": false, "max_length": 400 }
+      ]
+    },
+    {
+      "op": "create_index",
+      "table": "ad_accounts",
+      "name": "ad_accounts_key",
+      "columns": ["account_key"],
+      "unique": true
+    },
+    {
+      "op": "create_table",
+      "table": "ad_campaigns",
+      "columns": [
+        { "name": "campaign_key", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "account_key", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "platform", "type": "text", "nullable": false, "enum": ["meta", "google"] },
+        { "name": "external_campaign_id", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "name", "type": "text", "nullable": false, "max_length": 160 },
+        { "name": "objective", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "status", "type": "text", "nullable": false, "enum": ["ACTIVE", "PAUSED", "LIMITED"] },
+        { "name": "daily_budget_minor", "type": "integer", "nullable": false },
+        { "name": "spend_7d_minor", "type": "integer", "nullable": false, "default": 0 },
+        { "name": "impressions_7d", "type": "integer", "nullable": false, "default": 0 },
+        { "name": "clicks_7d", "type": "integer", "nullable": false, "default": 0 },
+        { "name": "google_conversions", "type": "integer", "nullable": true },
+        { "name": "meta_actions_json", "type": "json", "nullable": true },
+        { "name": "cpa_minor", "type": "integer", "nullable": true },
+        { "name": "ad_sets_json", "type": "json", "nullable": false }
+      ]
+    },
+    {
+      "op": "create_index",
+      "table": "ad_campaigns",
+      "name": "ad_campaigns_key",
+      "columns": ["campaign_key"],
+      "unique": true
+    },
+    {
+      "op": "create_index",
+      "table": "ad_campaigns",
+      "name": "ad_campaigns_account_idx",
+      "columns": ["account_key"],
+      "unique": false
+    },
+    {
+      "op": "create_table",
+      "table": "ad_proposals",
+      "columns": [
+        { "name": "proposal_key", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "account_key", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "campaign_key", "type": "text", "nullable": true, "max_length": 64 },
+        { "name": "campaign_name", "type": "text", "nullable": false, "max_length": 160 },
+        { "name": "platform", "type": "text", "nullable": false, "enum": ["meta", "google"] },
+        { "name": "tool_slug", "type": "text", "nullable": false, "max_length": 80 },
+        { "name": "action_type", "type": "text", "nullable": false, "enum": ["budget_update", "pause", "resume", "create_campaign"] },
+        { "name": "before_label", "type": "text", "nullable": false, "max_length": 160 },
+        { "name": "after_label", "type": "text", "nullable": false, "max_length": 160 },
+        { "name": "new_budget_minor", "type": "integer", "nullable": true },
+        { "name": "rationale", "type": "text", "nullable": false, "max_length": 600 },
+        { "name": "proposed_by", "type": "text", "nullable": false, "max_length": 80 },
+        { "name": "proposed_at", "type": "text", "nullable": false, "max_length": 40 },
+        { "name": "status", "type": "text", "nullable": false, "enum": ["pending", "applied", "rejected"], "default": "pending" },
+        { "name": "action_id_hex", "type": "text", "nullable": false, "max_length": 64 }
+      ]
+    },
+    {
+      "op": "create_index",
+      "table": "ad_proposals",
+      "name": "ad_proposals_key",
+      "columns": ["proposal_key"],
+      "unique": true
+    },
+    {
+      "op": "create_index",
+      "table": "ad_proposals",
+      "name": "ad_proposals_account_idx",
+      "columns": ["account_key"],
+      "unique": false
+    },
+    {
+      "op": "create_table",
+      "table": "creative_assets",
+      "columns": [
+        { "name": "asset_key", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "name", "type": "text", "nullable": false, "max_length": 120 },
+        { "name": "media_kind", "type": "text", "nullable": false, "enum": ["image", "video"] },
+        { "name": "mime", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "dimensions", "type": "text", "nullable": false, "max_length": 32 },
+        { "name": "duration_seconds", "type": "integer", "nullable": true },
+        { "name": "size_bytes", "type": "integer", "nullable": false },
+        { "name": "wiki_path", "type": "text", "nullable": false, "max_length": 200 },
+        { "name": "sha256", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "sync_status", "type": "text", "nullable": false, "enum": ["workspace_only", "synced_meta", "synced_google", "over_hosted_cap"] },
+        { "name": "target_campaign", "type": "text", "nullable": false, "max_length": 160 },
+        { "name": "platform_ref", "type": "text", "nullable": false, "max_length": 160 }
+      ]
+    },
+    {
+      "op": "create_index",
+      "table": "creative_assets",
+      "name": "creative_assets_key",
+      "columns": ["asset_key"],
+      "unique": true
+    },
+    {
+      "op": "create_table",
+      "table": "audit_events",
+      "columns": [
+        { "name": "event_key", "type": "text", "nullable": false, "max_length": 64 },
+        { "name": "kind", "type": "text", "nullable": false, "enum": ["sync", "proposal", "alert", "approval"] },
+        { "name": "summary", "type": "text", "nullable": false, "max_length": 400 },
+        { "name": "summary_zh", "type": "text", "nullable": true, "max_length": 400 },
+        { "name": "occurred_at", "type": "text", "nullable": false, "max_length": 40 }
+      ]
+    },
+    {
+      "op": "create_index",
+      "table": "audit_events",
+      "name": "audit_events_key",
+      "columns": ["event_key"],
+      "unique": true
+    }
+  ]
+}
