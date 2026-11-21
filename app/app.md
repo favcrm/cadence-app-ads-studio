@@ -2,7 +2,7 @@
 app: ads-studio
 title: Ads Studio
 version: '0.1.0'
-summary: Cross-channel Meta Ads & Google Ads workspace for campaign monitoring, guardrail enforcement, owner-approved spend changes, and Workspace media pointers.
+summary: Cross-channel Meta Ads and Google Ads console for spend guardrails, owner-approved changes, and Workspace media pointers.
 needs:
   connections: []
   requires:
@@ -28,6 +28,11 @@ listing:
       - Staged spend/status change proposals and append-only audit events
       - Workspace Media asset pointers with sha256 and path metadata only
     personal: false
+  i18n:
+    zh-TW:
+      title: 廣告工作台
+      tagline: 統一檢視 Meta 與 Google 廣告支出並以負責人審批控管變更
+      summary: 在同一工作區追蹤 Meta 與 Google 廣告活動、設定每日支出護欄、審批預算與狀態調整，並管理工作區素材指標。
 ---
 
 # Ads Studio
