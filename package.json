@@ -1,7 +1,7 @@
 {
   "name": "cadence-app-ads-studio",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev-preview.mjs",
@@ -9,7 +9,7 @@
     "build": "node scripts/build_screen.mjs",
     "verify": "node scripts/verify_screen.mjs",
     "check:schema": "bun run scripts/check_host_schema.mjs",
-    "test": "bun test tests/unit/ads_domain.test.mjs tests/unit/locale_catalog.test.mjs tests/unit/storage_descriptor.test.mjs tests/contract/screen_bundle.test.mjs"
+    "test": "bun test tests/unit/ads_domain.test.mjs tests/unit/locale_catalog.test.mjs tests/unit/storage_descriptor.test.mjs tests/unit/skills_package.test.mjs tests/contract/screen_bundle.test.mjs"
   },
   "cadence": {
     "app": "ads-studio",
