@@ -1,7 +1,7 @@
 ---
 app: ads-studio
 title: Ads Studio
-version: '0.1.0'
+version: '0.2.0'
 summary: Cross-channel Meta Ads and Google Ads console for spend guardrails, owner-approved changes, and Workspace media pointers.
 needs:
   connections: []
@@ -33,6 +33,11 @@ listing:
       title: 廣告工作台
       tagline: 統一檢視 Meta 與 Google 廣告支出並以負責人審批控管變更
       summary: 在同一工作區追蹤 Meta 與 Google 廣告活動、設定每日支出護欄、審批預算與狀態調整，並管理工作區素材指標。
+  changes:
+    - version: '0.2.0'
+      notes:
+        - Add four bundled assistant skills for spend audits, staged proposals, and creative policy checks
+      keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
 ---
 
 # Ads Studio
@@ -57,4 +62,14 @@ Five owner-only tables live in `app-storage.json` (`storage/001-initial.json`):
 - `audit_events` (`append_only` journal)
 
 All monetary figures use integer minor units (`*_minor`) paired with currency.
-Live Composio connector reads/effects (`AOS-686`) are deferred to `0.2.0`.
+Live Composio connector reads/effects (`AOS-686`) activate after platform qualification.
+
+## Assistant access
+
+The assistant reads and stages records through the five `screen-records.v1` verbs declared by `screens/ads-studio/screens.json`: `records.list`, `records.show`, `records.create`, `records.update`, and `records.batch`. All tables require owner reads, and staged writes await explicit owner approval before committing.
+
+Four bundled skills under `skills/` guide assistant workflows:
+- `ads-operator` — routes paid-acquisition questions and enforces owner-approval, minor-unit, and separated-conversion rules
+- `spend-audit` — read-only spend pacing, CPA outlier, pending-proposal, and audit-log inspection via paginated `records.list` / `records.show` reads and section-based `canvas_open` views
+- `spend-proposal` — validates guardrails and stages one `pending` budget, pause/resume, or `PAUSED` campaign proposal in `ad_proposals`
+- `creative-audit` — checks `creative_assets` Workspace pointers, `15 MiB` hosted / `100 MB` native media caps, and Google RSA / Meta ad copy against `rubrics/ad-policy.md`
