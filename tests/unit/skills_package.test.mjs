@@ -5,7 +5,13 @@ import { join, relative, resolve, sep } from "node:path";
 const root = resolve(import.meta.dirname, "../..");
 const skillsRoot = resolve(root, "app/skills");
 
-const EXPECTED_SKILLS = ["ads-operator", "creative-audit", "spend-audit", "spend-proposal"];
+const EXPECTED_SKILLS = [
+  "ads-operator",
+  "ads-sync",
+  "creative-audit",
+  "spend-audit",
+  "spend-proposal",
+];
 
 function listRelativeFiles(dir, current = dir) {
   const out = [];
@@ -21,7 +27,7 @@ function listRelativeFiles(dir, current = dir) {
 }
 
 describe("ads-studio bundled skill packages", () => {
-  test("all four skill directories ship valid skill.json manifests and SKILL.md frontmatter", () => {
+  test("all five skill directories ship valid skill.json manifests and SKILL.md frontmatter", () => {
     expect(existsSync(skillsRoot)).toBe(true);
     const dirs = readdirSync(skillsRoot).sort();
     expect(dirs).toEqual(EXPECTED_SKILLS);

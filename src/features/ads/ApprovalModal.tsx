@@ -42,8 +42,8 @@ export function ApprovalModal({
 
   return (
     <ConfirmDialog
-      title={t("Approve live ad change?")}
-      confirmLabel={t("Approve & Apply")}
+      title={t("Approve ad change proposal?")}
+      confirmLabel={t("Approve & Record")}
       pending={pending}
       error={error}
       onConfirm={() => void act("applied")}
@@ -52,7 +52,7 @@ export function ApprovalModal({
         <div style={{ display: "grid", gap: "12px" }}>
           <p style={{ margin: 0 }}>
             {t(
-              "Modifies live advertising spend billed directly by Google/Meta when connected, and updates workspace budget state now.",
+              "Records your owner decision in Ads Studio's workspace ledger and audit journal. Live Meta Ads / Google Ads execution uses the host confirmation card staged in chat.",
             )}
           </p>
           <Detail

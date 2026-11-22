@@ -1,8 +1,8 @@
-import { Button } from "@cadence/screen-ui";
+import { Button, EmptyState } from "@cadence/screen-ui";
 import { useState } from "react";
 import {
   assetCapStatus,
-  checkRsaLimits,
+  evaluateAdCopyPolicy,
   formatBytesCompact,
   formatDuration,
   type CreativeAssetProfile,
@@ -70,6 +70,25 @@ export function AssetGraphic({
     );
   }
   const ring = assetCapStatus(asset.size_bytes) !== "within_hosted" ? "#fbbf24" : "#61afef";
+  if (asset.media_kind === "image") {
+    return (
+      <svg viewBox="0 0 220 110" width="220" height="110" style={{ width: "100%", height: "100%" }}>
+        <rect width="220" height="110" fill="#191d24" />
+        <rect x="20" y="16" width="60" height="78" rx="6" fill="#12151a" stroke={ring} strokeWidth="1.5" />
+        <circle cx="40" cy="36" r="6" fill="#61afef" fillOpacity="0.7" />
+        <polygon points="28,82 46,56 62,72 70,64 74,82" fill="#4ade80" fillOpacity="0.55" />
+        <text x="94" y="44" fontSize="11" fontWeight="600" fill="#f0f2f6">
+          {asset.mime}
+        </text>
+        <text x="94" y="62" fontSize="9.5" fill="#abb2bf">
+          {asset.dimensions} · sha:{asset.sha256.slice(0, 8)}
+        </text>
+        <text x="94" y="78" fontSize="9" fill="#8b949e">
+          Workspace Files pointer
+        </text>
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 220 110" width="220" height="110" style={{ width: "100%", height: "100%" }}>
       <rect width="220" height="110" fill="#191d24" />
@@ -86,7 +105,7 @@ export function AssetGraphic({
       <circle cx="110" cy="50" r="14" fill="#ffffff" fillOpacity="0.16" stroke="#ffffff" />
       <polygon points="106,43 118,50 106,57" fill="#ffffff" />
       <text x="110" y="88" textAnchor="middle" fontSize="8" fill="#d1d6df">
-        {formatDuration(asset.duration_seconds) || "0:15"} · 9:16
+        {formatDuration(asset.duration_seconds) || "video"} · {asset.dimensions}
       </text>
     </svg>
   );
@@ -105,28 +124,41 @@ export function CreativesTab({
 }) {
   const { t } = useLocale();
   const [filter, setFilter] = useState<"all" | "image" | "video">("all");
-  const [metaMode, setMetaMode] = useState<"image" | "video">("image");
+  const [rsaH1, setRsaH1] = useState("Single Origin Beans HK");
+  const [rsaH2, setRsaH2] = useState("Freshly Roasted Weekly");
+  const [rsaH3, setRsaH3] = useState("From HK$148 · Weekly");
+  const [rsaD1, setRsaD1] = useState(
+    "Small-batch coffee roasted weekly in Hong Kong. 250g bags or flexible office plans.",
+  );
+  const [rsaD2, setRsaD2] = useState(
+    "Tasting notes verified per harvest. Pause or skip any delivery online.",
+  );
+  const [metaHeadline, setMetaHeadline] = useState("Single Origin 250g · From HK$148");
+  const [metaPrimary, setMetaPrimary] = useState(
+    "Fresh weekly small-batch roast delivered across Hong Kong. Flexible weekly plans.",
+  );
 
   const visible = assets.filter((a) => filter === "all" || a.profile.media_kind === filter);
   const imageCount = assets.filter((a) => a.profile.media_kind === "image").length;
   const videoCount = assets.filter((a) => a.profile.media_kind === "video").length;
 
-  const headlines = [
-    "Single Origin Beans HK",
-    "Freshly Roasted Weekly",
-    "From HK$148 · Free Delivery",
-  ];
-  const descriptions = [
-    "Small-batch coffee roasted weekly in Hong Kong. 250g bags or flexible office plans.",
-    "Tasting notes verified per harvest. Pause or skip any delivery online.",
-  ];
-  const rsa = checkRsaLimits(headlines, descriptions);
+  const rsaEval = evaluateAdCopyPolicy({
+    channel: "google_rsa",
+    headlines: [rsaH1, rsaH2, rsaH3],
+    descriptions: [rsaD1, rsaD2],
+  });
+  const metaEval = evaluateAdCopyPolicy({
+    channel: "meta",
+    headlines: [metaHeadline],
+    descriptions: [],
+    primaryText: metaPrimary,
+  });
 
   const syncLabel = (a: CreativeAssetProfile) => {
     if (a.sync_status === "synced_meta") return "Synced · Meta image_hash";
     if (a.sync_status === "synced_google") return "Attached · Google PMax";
     if (a.sync_status === "over_hosted_cap") return "Over 15 MB hosted cap · R2 / YT";
-    return "Ready · Meta Reels / Shorts";
+    return "Workspace Files · pointer";
   };
 
   return (
@@ -172,117 +204,161 @@ export function CreativesTab({
         </button>
       </div>
 
-      <div className="ads-asset-grid">
-        {visible.map((rec) => {
-          const a = rec.profile;
-          return (
-            <button
-              key={rec.id}
-              type="button"
-              className="ads-card ads-asset-btn"
-              onClick={() => onInspectAsset(rec.id)}
-            >
-              <div className="ads-asset-stage">
-                <AssetGraphic asset={a} />
+      {visible.length === 0 ? (
+        <EmptyState name="creatives" title={t("No creative pointers registered yet")}>
+          <div style={{ display: "grid", gap: "10px" }}>
+            <p style={{ margin: 0 }}>
+              {t(
+                "Upload images or MP4 cuts into Workspace Files (global/ads-studio/assets/), then ask the assistant to scan wiki_list media or register a pointer manually.",
+              )}
+            </p>
+            {canWrite && (
+              <div>
+                <Button onClick={onAddAsset}>+ {t("Add media pointer")}</Button>
               </div>
-              <div style={{ display: "grid", gap: "4px", minWidth: 0 }}>
-                <strong
-                  className="text-secondary text-ink-100"
-                  style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                >
-                  {a.name}
-                </strong>
-                <div className="text-micro text-ink-400 num">
-                  {a.dimensions} · {formatBytesCompact(a.size_bytes)} · sha256:{a.sha256.slice(0, 8)}
+            )}
+          </div>
+        </EmptyState>
+      ) : (
+        <div className="ads-asset-grid">
+          {visible.map((rec) => {
+            const a = rec.profile;
+            return (
+              <button
+                key={rec.id}
+                type="button"
+                className="ads-card ads-asset-btn"
+                onClick={() => onInspectAsset(rec.id)}
+              >
+                <div className="ads-asset-stage">
+                  <AssetGraphic asset={a} />
                 </div>
-              </div>
-              <div style={{ marginTop: "auto" }}>
-                <StatusPill tone={statusTone(a.sync_status)}>{syncLabel(a)}</StatusPill>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+                <div style={{ display: "grid", gap: "4px", minWidth: 0 }}>
+                  <strong
+                    className="text-secondary text-ink-100"
+                    style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                  >
+                    {a.name}
+                  </strong>
+                  <div className="text-micro text-ink-400 num">
+                    {a.dimensions} · {formatBytesCompact(a.size_bytes)} · sha256:{a.sha256.slice(0, 8)}
+                  </div>
+                </div>
+                <div style={{ marginTop: "auto" }}>
+                  <StatusPill tone={statusTone(a.sync_status)}>{syncLabel(a)}</StatusPill>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="ads-title-stack">
         <h3 className="text-cardtitle">{t("Rubric-checked creative briefs")}</h3>
         <span className="text-micro text-ink-500">
-          {t("Checked against rubrics/ad-policy.md before campaign attachment")}
+          {t("Live policy check (half-width CJK RSA units & unverified superlative guard) per rubrics/ad-policy.md")}
         </span>
       </div>
 
       <div className="ads-creative-grid">
         <article className="ads-card">
           <div className="ads-row-between">
-            <strong>{t("Google Search RSA · Specialty Coffee HK")}</strong>
-            <StatusPill tone={rsa.ok ? "ok" : "fail"}>{t("Rubric pass")}</StatusPill>
+            <strong>{t("Google Search RSA Checker")}</strong>
+            <StatusPill tone={rsaEval.ok ? "ok" : "warn"}>
+              {rsaEval.ok ? t("Rubric pass") : t("Check limits")}
+            </StatusPill>
           </div>
-          <div className="ads-inset">
-            <div className="text-micro text-ink-400">Sponsored · harbourroasters.hk/beans</div>
-            <div className="text-cardtitle" style={{ color: "var(--color-accent)", fontWeight: 600 }}>
-              {headlines.join(" | ")}
-            </div>
-            <div className="text-label text-ink-300">{descriptions.join(" ")}</div>
-          </div>
-          <div style={{ display: "grid", gap: "6px" }} className="num text-label">
-            {headlines.map((h, i) => (
-              <div key={h} className="ads-row-between">
-                <span>
-                  H{i + 1}: {h}
-                </span>
-                <span>{h.length}/30</span>
+          <div style={{ display: "grid", gap: "8px" }}>
+            {[
+              { label: "H1", val: rsaH1, set: setRsaH1, count: rsaEval.headlineCounts[0]! },
+              { label: "H2", val: rsaH2, set: setRsaH2, count: rsaEval.headlineCounts[1]! },
+              { label: "H3", val: rsaH3, set: setRsaH3, count: rsaEval.headlineCounts[2]! },
+            ].map((row) => (
+              <div key={row.label} style={{ display: "grid", gap: "4px" }}>
+                <div className="ads-row-between text-micro num">
+                  <span>{row.label}</span>
+                  <span style={{ color: row.count.ok ? "var(--color-ink-400)" : "var(--color-warn)" }}>
+                    {row.count.units}/30 {t("units")} ({row.count.chars} {t("chars")})
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  aria-label={`Google RSA ${row.label}`}
+                  className="field"
+                  value={row.val}
+                  onChange={(e) => row.set(e.target.value)}
+                />
+              </div>
+            ))}
+            {[
+              { label: "D1", val: rsaD1, set: setRsaD1, count: rsaEval.descriptionCounts[0]! },
+              { label: "D2", val: rsaD2, set: setRsaD2, count: rsaEval.descriptionCounts[1]! },
+            ].map((row) => (
+              <div key={row.label} style={{ display: "grid", gap: "4px" }}>
+                <div className="ads-row-between text-micro num">
+                  <span>{row.label}</span>
+                  <span style={{ color: row.count.ok ? "var(--color-ink-400)" : "var(--color-warn)" }}>
+                    {row.count.units}/90 {t("units")} ({row.count.chars} {t("chars")})
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  aria-label={`Google RSA ${row.label}`}
+                  className="field"
+                  value={row.val}
+                  onChange={(e) => row.set(e.target.value)}
+                />
               </div>
             ))}
           </div>
+          {rsaEval.issues.length > 0 && (
+            <div className="text-micro" style={{ color: "var(--color-warn)", display: "grid", gap: "2px" }}>
+              {rsaEval.issues.map((issue) => (
+                <span key={issue}>{issue}</span>
+              ))}
+            </div>
+          )}
         </article>
 
         <article className="ads-card">
           <div className="ads-row-between">
-            <strong>{t("Meta Feed / Reels · Single Origin Launch")}</strong>
-            <div className="ads-chips">
-              <button
-                type="button"
-                className="ads-chip"
-                aria-pressed={metaMode === "image"}
-                onClick={() => setMetaMode("image")}
-              >
-                {t("1:1 Image")}
-              </button>
-              <button
-                type="button"
-                className="ads-chip"
-                aria-pressed={metaMode === "video"}
-                onClick={() => setMetaMode("video")}
-              >
-                {t("9:16 Reels Video")}
-              </button>
-            </div>
+            <strong>{t("Meta Feed / Reels Checker")}</strong>
+            <StatusPill tone={metaEval.ok ? "ok" : "warn"}>
+              {metaEval.ok ? t("Rubric pass") : t("Check policy")}
+            </StatusPill>
           </div>
-          <div className="ads-inset">
-            <div className="ads-row-between text-label">
-              <span>
-                <strong>Harbour Roasters HK</strong> · Sponsored
-              </span>
-              <span className="text-micro text-ink-400 num">
-                {metaMode === "video" ? "9:16 · 0:12 MP4" : "1:1 · WebP"}
-              </span>
+          <div style={{ display: "grid", gap: "8px" }}>
+            <div className="ads-row-between text-micro num">
+              <span>{t("Headline")}</span>
+              <span>{metaHeadline.length} {t("chars")}</span>
             </div>
-            <div className="ads-asset-stage" style={{ height: "144px" }}>
-              <AssetGraphic
-                asset={
-                  assets.find(
-                    (x) =>
-                      x.profile.asset_key === (metaMode === "video" ? "ast_vid_01" : "ast_img_01"),
-                  )?.profile ?? assets[0]!.profile
-                }
-              />
+            <input
+              type="text"
+              aria-label={t("Headline")}
+              className="field"
+              value={metaHeadline}
+              onChange={(e) => setMetaHeadline(e.target.value)}
+            />
+            <div className="ads-row-between text-micro num">
+              <span>{t("Primary text")}</span>
+              <span>{metaPrimary.length} {t("chars")}</span>
             </div>
-            <div className="ads-row-between text-label">
-              <span>
-                <strong>From HK$148 · Weekly Roast</strong>
+            <textarea
+              rows={3}
+              aria-label={t("Primary text")}
+              className="field"
+              value={metaPrimary}
+              onChange={(e) => setMetaPrimary(e.target.value)}
+            />
+          </div>
+          <div className="ads-inset text-label">
+            <strong style={{ color: "var(--color-ink-100)" }}>{metaHeadline}</strong>
+            <span className="text-ink-300">{metaPrimary}</span>
+            {metaEval.issues.length > 0 && (
+              <span className="text-micro" style={{ color: "var(--color-warn)" }}>
+                {metaEval.issues.join(" ")}
               </span>
-              <StatusPill tone="ok">{t("Rubric pass")}</StatusPill>
-            </div>
+            )}
           </div>
         </article>
       </div>

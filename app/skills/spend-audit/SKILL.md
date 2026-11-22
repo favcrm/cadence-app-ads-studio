@@ -11,7 +11,7 @@ Exact table names, column schemas, pagination patterns, and canvas opening rules
 
 ## Procedure
 
-1. Read `ad_accounts` (default table) via `records.list` (`limit: 100`, paging `next_cursor` until `null`) to obtain each account's `account_key`, `platform`, `currency`, `status`, and `daily_guardrail_minor`.
+1. Read `ad_accounts` (default table) via `records.list` (`limit: 100`, paging `next_cursor` until `null`) to obtain each account's `account_key`, `platform`, `currency`, `status`, and `daily_guardrail_minor`. If `ad_accounts` or `ad_campaigns` is empty, or if `synced_at` is stale and the owner wants fresh metrics, hand off to `ads-sync`.
 2. Read `ad_campaigns` via `records.list` (`limit: 100`, paging `next_cursor` until `null`) with appropriate filters (`platform`, `account_key`, or `status`) or read an individual record with `records.show`.
 3. When checking queued work or history, also page `ad_proposals` (filtering `status: "pending"` when asked what awaits approval) and `audit_events` (`kind` in `sync | proposal | alert | approval`).
 4. Verify completeness before computing totals: if any `records.list` response returns `truncated: true`, stops before `next_cursor` is `null`, or is refused/fails, report clearly which table could not be read in full and do not present partial totals as complete.

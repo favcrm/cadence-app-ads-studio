@@ -1,7 +1,9 @@
 import { Button, DataTable, EmptyState, type DataTableColumn } from "@cadence/screen-ui";
 import {
+  accountCurrency,
   filterCampaigns,
   isCpaOutlier,
+  type AdAccountProfile,
   type AdCampaignProfile,
   type CampaignStatus,
   type Platform,
@@ -12,6 +14,7 @@ import { useLocale } from "./locale";
 import { StatusPill, statusTone } from "./StatusPill";
 
 export function CampaignsTab({
+  accounts,
   campaigns,
   search,
   platformFilter,
@@ -22,6 +25,7 @@ export function CampaignsTab({
   onClearFilters,
   onInspectCampaign,
 }: {
+  accounts: readonly StoredRecord<AdAccountProfile>[];
   campaigns: readonly StoredRecord<AdCampaignProfile>[];
   search: string;
   platformFilter: "all" | Platform;
@@ -86,13 +90,13 @@ export function CampaignsTab({
       key: "budget",
       header: t("Budget/d"),
       cellClassName: "ads-num-col num",
-      cell: ({ profile: c }) => fmtMoney(c.daily_budget_minor),
+      cell: ({ profile: c }) => fmtMoney(c.daily_budget_minor, accountCurrency(accounts, c.account_key)),
     },
     {
       key: "spend",
       header: t("7d Spend"),
       cellClassName: "ads-num-col num",
-      cell: ({ profile: c }) => fmtMoney(c.spend_7d_minor),
+      cell: ({ profile: c }) => fmtMoney(c.spend_7d_minor, accountCurrency(accounts, c.account_key)),
     },
     {
       key: "clicks",
@@ -140,17 +144,19 @@ export function CampaignsTab({
       key: "cpa",
       header: t("CPA"),
       cellClassName: "ads-num-col num",
-      cell: ({ profile: c }) =>
-        isCpaOutlier(c.cpa_minor) ? (
+      cell: ({ profile: c }) => {
+        const curr = accountCurrency(accounts, c.account_key);
+        return isCpaOutlier(c.cpa_minor) ? (
           <div>
-            <span className="ads-cpa-warn">{fmtMoney(c.cpa_minor)}</span>
+            <span className="ads-cpa-warn">{fmtMoney(c.cpa_minor, curr)}</span>
             <div className="text-micro" style={{ color: "var(--color-warn)" }}>
-              &gt; HK$180
+              &gt; {fmtMoney(18000, curr)}
             </div>
           </div>
         ) : (
-          fmtMoney(c.cpa_minor)
-        ),
+          fmtMoney(c.cpa_minor, curr)
+        );
+      },
     },
     {
       key: "action",

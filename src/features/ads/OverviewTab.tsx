@@ -1,7 +1,10 @@
 import { Button, EmptyState, Select } from "@cadence/screen-ui";
 import {
   STARTER_DAILY_PACING,
+  accountCurrency,
+  computeChannelPacing,
   isCpaOutlier,
+  isStarterDataset,
   summarizeOverview,
   type AdAccountProfile,
   type AdCampaignProfile,
@@ -26,6 +29,7 @@ export function OverviewTab({
   onRangeChange,
   onPlatformChange,
   onSeedStarter,
+  onAddAccount,
   onGoSection,
   onInspectCampaign,
 }: {
@@ -40,6 +44,7 @@ export function OverviewTab({
   onRangeChange: (next: string) => void;
   onPlatformChange: (next: "all" | Platform) => void;
   onSeedStarter: () => void;
+  onAddAccount: () => void;
   onGoSection: (section: "campaigns" | "proposals") => void;
   onInspectCampaign: (id: string) => void;
 }) {
@@ -52,11 +57,14 @@ export function OverviewTab({
           <div style={{ display: "grid", gap: "12px" }}>
             <p style={{ margin: 0 }}>
               {t(
-                "No ad accounts or campaigns are saved in this workspace yet. Load the synthetic sample dataset to test guardrails, spend approvals, and Workspace media pointers, or wait for live Composio connector sync (AOS-686).",
+                "Add a Meta Ads or Google Ads account to track real guardrails and Workspace media pointers, sync live campaigns via chat, or load the synthetic sample dataset.",
               )}
             </p>
-            <div>
-              <Button variant="primary" loading={seeding} onClick={onSeedStarter}>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <Button variant="primary" onClick={onAddAccount}>
+                + {t("Add ad account")}
+              </Button>
+              <Button loading={seeding} onClick={onSeedStarter}>
                 {t("Load sample workspace")}
               </Button>
             </div>
@@ -81,16 +89,32 @@ export function OverviewTab({
   const summary = summarizeOverview(filtered.map((r) => r.profile));
   const pendingCount = proposals.filter((p) => p.profile.status === "pending").length;
 
-  const metaGuard =
-    accounts.find((a) => a.profile.platform === "meta")?.profile.daily_guardrail_minor ?? 250000;
-  const googleGuard =
-    accounts.find((a) => a.profile.platform === "google")?.profile.daily_guardrail_minor ?? 200000;
+  const metaAccount = accounts.find((a) => a.profile.platform === "meta")?.profile;
+  const googleAccount = accounts.find((a) => a.profile.platform === "google")?.profile;
+  const displayCurrency =
+    platformFilter === "meta"
+      ? (metaAccount?.currency ?? accounts[0]?.profile.currency ?? "HKD")
+      : platformFilter === "google"
+        ? (googleAccount?.currency ?? accounts[0]?.profile.currency ?? "HKD")
+        : (accounts[0]?.profile.currency ?? "HKD");
+  const metaCurrency = metaAccount?.currency ?? displayCurrency;
+  const googleCurrency = googleAccount?.currency ?? displayCurrency;
+
+  const metaGuard = accounts
+    .filter((a) => a.profile.platform === "meta")
+    .reduce((s, a) => s + a.profile.daily_guardrail_minor, 0);
+  const googleGuard = accounts
+    .filter((a) => a.profile.platform === "google")
+    .reduce((s, a) => s + a.profile.daily_guardrail_minor, 0);
   const guardrailCeilingMinor =
     platformFilter === "meta"
       ? metaGuard
       : platformFilter === "google"
         ? googleGuard
         : metaGuard + googleGuard;
+
+  const starterMode = isStarterDataset(campaigns);
+  const realPacing = computeChannelPacing(filtered, accounts);
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
@@ -143,17 +167,20 @@ export function OverviewTab({
       <div className="ads-kpi-grid">
         <article className="ads-card ads-kpi-card">
           <div>
-            <div className="ads-kpi-label">{t("7d Spend (HKD)")}</div>
-            <div className="ads-kpi-value num">{fmtMoney(summary.totalSpendMinor)}</div>
+            <div className="ads-kpi-label">{t("7d Spend")}</div>
+            <div className="ads-kpi-value num">
+              {fmtMoney(summary.totalSpendMinor, displayCurrency)}
+            </div>
           </div>
           <div className="ads-kpi-sub">
             <span>
               <span className="ads-dot ads-dot-meta" />
-              Meta: <span className="num">{fmtMoney(summary.metaSpendMinor)}</span>
+              Meta: <span className="num">{fmtMoney(summary.metaSpendMinor, metaCurrency)}</span>
             </span>
             <span>
               <span className="ads-dot ads-dot-google" />
-              Google: <span className="num">{fmtMoney(summary.googleSpendMinor)}</span>
+              Google:{" "}
+              <span className="num">{fmtMoney(summary.googleSpendMinor, googleCurrency)}</span>
             </span>
           </div>
         </article>
@@ -161,11 +188,13 @@ export function OverviewTab({
         <article className="ads-card ads-kpi-card">
           <div>
             <div className="ads-kpi-label">{t("Impressions")}</div>
-            <div className="ads-kpi-value num">{summary.totalImpressions.toLocaleString("en-US")}</div>
+            <div className="ads-kpi-value num">
+              {summary.totalImpressions.toLocaleString("en-US")}
+            </div>
           </div>
           <div className="ads-kpi-sub">
             <span>
-              {summary.trackedCount} {t("tracked campaigns · HK")}
+              {summary.trackedCount} {t("tracked campaigns")} · {displayCurrency}
             </span>
           </div>
         </article>
@@ -183,7 +212,7 @@ export function OverviewTab({
           <div className="ads-kpi-sub">
             <span>
               {t("CPC blended:")}{" "}
-              <span className="num">{fmtMoney(summary.blendedCpcMinor)}</span>
+              <span className="num">{fmtMoney(summary.blendedCpcMinor, displayCurrency)}</span>
             </span>
           </div>
         </article>
@@ -229,54 +258,114 @@ export function OverviewTab({
               {t("7-day spend pacing by channel")}
             </h3>
             <span className="text-micro text-ink-500 num">
-              {t("Daily guardrail:")} {fmtCompactMoney(guardrailCeilingMinor)}
+              {t("Daily guardrail:")} {fmtCompactMoney(guardrailCeilingMinor, displayCurrency)}
             </span>
           </div>
-          <div className="ads-chart-shell">
-            <div className="ads-chart-yaxis">
-              <span>{fmtCompactMoney(guardrailCeilingMinor)}</span>
-              <span>{fmtCompactMoney(Math.round(guardrailCeilingMinor / 2))}</span>
-              <span>HK$0</span>
-            </div>
-            <div className="ads-chart-plot">
-              <div className="ads-guide-top" aria-hidden="true" />
-              <div className="ads-guide-mid" aria-hidden="true" />
-              <div className="ads-bars" role="img" aria-label={t("7-day spend pacing by channel")}>
-                {STARTER_DAILY_PACING.map((d) => {
-                  const gMin = platformFilter === "meta" ? 0 : d.googleMinor;
-                  const mMin = platformFilter === "google" ? 0 : d.metaMinor;
-                  const totalMin = gMin + mMin;
-                  const gPct =
-                    guardrailCeilingMinor > 0
-                      ? Math.min(100, (gMin / guardrailCeilingMinor) * 100).toFixed(1)
-                      : "0";
-                  const mPct =
-                    guardrailCeilingMinor > 0
-                      ? Math.min(100, (mMin / guardrailCeilingMinor) * 100).toFixed(1)
-                      : "0";
-                  const totalLabel = fmtCompactMoney(totalMin).replace(/^HK\$/, "");
-                  return (
-                    <div
-                      key={d.day}
-                      className="ads-bar-col"
-                      title={`${d.day}: ${fmtMoney(totalMin)}`}
-                    >
-                      <div className="ads-bar-stack">
-                        <span className="ads-bar-total">{totalLabel}</span>
-                        {platformFilter !== "meta" && (
-                          <div className="ads-bar-google" style={{ height: `${gPct}%` }} />
-                        )}
-                        {platformFilter !== "google" && (
-                          <div className="ads-bar-meta" style={{ height: `${mPct}%` }} />
-                        )}
+
+          {starterMode ? (
+            <div className="ads-chart-shell">
+              <div className="ads-chart-yaxis">
+                <span>{fmtCompactMoney(guardrailCeilingMinor, displayCurrency)}</span>
+                <span>{fmtCompactMoney(Math.round(guardrailCeilingMinor / 2), displayCurrency)}</span>
+                <span>{fmtCompactMoney(0, displayCurrency)}</span>
+              </div>
+              <div className="ads-chart-plot">
+                <div className="ads-guide-top" aria-hidden="true" />
+                <div className="ads-guide-mid" aria-hidden="true" />
+                <div className="ads-bars" role="img" aria-label={t("7-day spend pacing by channel")}>
+                  {STARTER_DAILY_PACING.map((d) => {
+                    const gMin = platformFilter === "meta" ? 0 : d.googleMinor;
+                    const mMin = platformFilter === "google" ? 0 : d.metaMinor;
+                    const totalMin = gMin + mMin;
+                    const gPct =
+                      guardrailCeilingMinor > 0
+                        ? Math.min(100, (gMin / guardrailCeilingMinor) * 100).toFixed(1)
+                        : "0";
+                    const mPct =
+                      guardrailCeilingMinor > 0
+                        ? Math.min(100, (mMin / guardrailCeilingMinor) * 100).toFixed(1)
+                        : "0";
+                    const totalLabel = fmtCompactMoney(totalMin, displayCurrency).replace(
+                      /^(?:HK\$|US\$|€|£|[A-Z]{3}\s)/,
+                      "",
+                    );
+                    return (
+                      <div
+                        key={d.day}
+                        className="ads-bar-col"
+                        title={`${d.day}: ${fmtMoney(totalMin, displayCurrency)}`}
+                      >
+                        <div className="ads-bar-stack">
+                          <span className="ads-bar-total">{totalLabel}</span>
+                          {platformFilter !== "meta" && (
+                            <div className="ads-bar-google" style={{ height: `${gPct}%` }} />
+                          )}
+                          {platformFilter !== "google" && (
+                            <div className="ads-bar-meta" style={{ height: `${mPct}%` }} />
+                          )}
+                        </div>
+                        <span className="ads-bar-day">{d.day}</span>
                       </div>
-                      <span className="ads-bar-day">{d.day}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ display: "grid", gap: "12px", paddingTop: "6px" }}>
+              {realPacing.length === 0 ? (
+                <div className="text-label text-ink-400">
+                  {t("Ask the assistant in chat to sync live campaigns into this workspace.")}
+                </div>
+              ) : (
+                realPacing.map((row) => {
+                  const curr = row.platform === "meta" ? metaCurrency : googleCurrency;
+                  const ratio =
+                    row.guardrailMinor > 0
+                      ? Math.min(100, Math.round((row.dailyBudgetMinor / row.guardrailMinor) * 100))
+                      : 0;
+                  return (
+                    <div key={row.platform} className="ads-inset" style={{ gap: "8px" }}>
+                      <div className="ads-row-between text-label">
+                        <span>
+                          <span className={`ads-dot ads-dot-${row.platform}`} style={{ marginRight: "6px" }} />
+                          <strong>{row.platform === "meta" ? t("Meta Ads") : t("Google Ads")}</strong>
+                        </span>
+                        <span className="num text-ink-200">
+                          {fmtMoney(row.avgDailySpendMinor, curr)}/d avg ·{" "}
+                          {fmtMoney(row.dailyBudgetMinor, curr)} {t("active budget")}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          height: "8px",
+                          borderRadius: "999px",
+                          background: "var(--color-ink-700)",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${ratio}%`,
+                            height: "100%",
+                            background:
+                              row.platform === "meta" ? "var(--color-info)" : "var(--color-ok)",
+                          }}
+                        />
+                      </div>
+                      <div className="ads-row-between text-micro text-ink-400 num">
+                        <span>7d: {fmtMoney(row.spend7dMinor, curr)}</span>
+                        <span>
+                          {t("Daily guardrail:")} {fmtMoney(row.guardrailMinor, curr)} ({ratio}%)
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
           <div className="ads-row-between text-micro text-ink-400">
             <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
               {platformFilter !== "google" && (
@@ -333,38 +422,47 @@ export function OverviewTab({
           </Button>
         </div>
         <div style={{ display: "grid", gap: "8px" }}>
-          {filtered.slice(0, 4).map((row) => (
-            <div
-              key={row.id}
-              className="ads-row-between"
-              style={{ paddingBottom: "8px", borderBottom: "1px solid var(--color-ink-700)" }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <button
-                  type="button"
-                  className="lnk"
-                  style={{ fontWeight: 600, textAlign: "left" }}
-                  onClick={() => onInspectCampaign(row.id)}
-                >
-                  {row.profile.name}
-                </button>
-                <div className="text-micro text-ink-500 num">
-                  {row.profile.platform === "meta" ? t("Meta Ads") : t("Google Ads")} ·{" "}
-                  {fmtMoney(row.profile.spend_7d_minor)}
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span
-                  className={`num text-label ${isCpaOutlier(row.profile.cpa_minor) ? "ads-cpa-warn" : ""}`}
-                >
-                  {fmtMoney(row.profile.cpa_minor)}
-                </span>
-                <Button size="sm" onClick={() => onInspectCampaign(row.id)}>
-                  {t("Inspect")}
-                </Button>
-              </div>
+          {filtered.length === 0 ? (
+            <div className="text-label text-ink-400">
+              {t("No campaigns synced yet. Ask the assistant to sync Meta Ads or Google Ads.")}
             </div>
-          ))}
+          ) : (
+            filtered.slice(0, 4).map((row) => {
+              const curr = accountCurrency(accounts, row.profile.account_key);
+              return (
+                <div
+                  key={row.id}
+                  className="ads-row-between"
+                  style={{ paddingBottom: "8px", borderBottom: "1px solid var(--color-ink-700)" }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <button
+                      type="button"
+                      className="lnk"
+                      style={{ fontWeight: 600, textAlign: "left" }}
+                      onClick={() => onInspectCampaign(row.id)}
+                    >
+                      {row.profile.name}
+                    </button>
+                    <div className="text-micro text-ink-500 num">
+                      {row.profile.platform === "meta" ? t("Meta Ads") : t("Google Ads")} ·{" "}
+                      {fmtMoney(row.profile.spend_7d_minor, curr)}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span
+                      className={`num text-label ${isCpaOutlier(row.profile.cpa_minor) ? "ads-cpa-warn" : ""}`}
+                    >
+                      {fmtMoney(row.profile.cpa_minor, curr)}
+                    </span>
+                    <Button size="sm" onClick={() => onInspectCampaign(row.id)}>
+                      {t("Inspect")}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </article>
     </div>

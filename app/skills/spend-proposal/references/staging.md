@@ -42,4 +42,5 @@
 - `ad_proposals.account_key` has a foreign-key reference to `ad_accounts.account_key`; staging fails if the account does not exist.
 - `audit_events` is `append_only: true`; only create new rows (`records.create` / `records.batch`), never `records.update`.
 - Always check existing `ad_proposals` with `status: "pending"` before staging so two identical proposals are not queued.
-- Keep `new_budget_minor` in integer minor units matching the account's `currency` (for HKD: `100` minor units = `HK$1.00`).
+- Keep `new_budget_minor` in integer minor units matching the account's `currency` (for HKD/USD: `100` minor units = `1.00`; note Google upstream `amount_micros = new_budget_minor * 10000`).
+- Live API execution uses `find_tools` + `use_tool`, which triggers a host `connected_effect` confirmation card in chat rather than mutating external campaigns silently.

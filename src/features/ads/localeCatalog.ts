@@ -125,4 +125,52 @@ export const zhHK: Record<string, string> = {
   "Guardrail Check": "上限檢查",
   "Upstream Tool": "目標工具",
   "Before → After": "變更前後",
+  "Credentials remain host-owned; ad-account pins and daily guardrails store in app-storage/v1.":
+    "憑證由宿主安全託管；廣告帳號綁定與每日上限儲存於 app-storage/v1。",
+  "Add ad account": "新增廣告帳號",
+  "No ad accounts pinned in this workspace yet. Add an account ID or connect Meta Ads / Google Ads in chat.":
+    "此工作區尚未綁定任何廣告帳號。請新增帳號 ID，或在對話中連接 Meta Ads / Google Ads。",
+  "Daily budget guardrail": "每日預算上限",
+  "Approve ad change proposal?": "核准並記錄廣告變更提案？",
+  "Approve & Record": "核准並記錄",
+  "Records your owner decision in Ads Studio's workspace ledger and audit journal. Live Meta Ads / Google Ads execution uses the host confirmation card staged in chat.":
+    "將您的負責人決定記錄於廣告工作台帳本與稽核日誌。實際寫入 Meta Ads / Google Ads 會在對話中使用宿主確認卡。",
+  "No creative pointers registered yet": "尚未登記任何素材指標",
+  "Upload images or MP4 cuts into Workspace Files (global/ads-studio/assets/), then ask the assistant to scan wiki_list media or register a pointer manually.":
+    "請先將圖片或 MP4 影片上傳至工作區檔案（global/ads-studio/assets/），再請助理掃描 wiki_list 媒體或手動登記指標。",
+  "Live policy check (half-width CJK RSA units & unverified superlative guard) per rubrics/ad-policy.md":
+    "依 rubrics/ad-policy.md 進行即時規範檢查（Google RSA 中日韓半形字寬與禁用誇大詞）。",
+  "Google Search RSA Checker": "Google 搜尋 RSA 檢查器",
+  "Check limits": "檢查字數上限",
+  units: "半形單位",
+  chars: "字元",
+  "Meta Feed / Reels Checker": "Meta 動態消息 / Reels 檢查器",
+  "Check policy": "檢查規範",
+  Headline: "標題",
+  "Primary text": "主要內文",
+  "New daily budget": "新每日預算",
+  "Ad Accounts": "廣告帳號",
+  "+ Add ad account": "+ 新增廣告帳號",
+  "Account Details": "帳號詳情",
+  Platform: "平台",
+  "Display Name": "顯示名稱",
+  "External Account ID": "外部帳號 ID",
+  "Google MCC ID (optional)": "Google MCC 管理員 ID（選填）",
+  Currency: "幣別",
+  Timezone: "時區",
+  "File Name": "檔案名稱",
+  "Media Kind": "媒體類型",
+  "MIME Type": "MIME 類型",
+  "From wiki_list media discovery": "來自 wiki_list 媒體探索",
+  "Duration (s)": "時長（秒）",
+  "File Size (MB)": "檔案大小（MB）",
+  "Ad Platform Ref (optional)": "廣告平台參照（選填）",
+  "Add a Meta Ads or Google Ads account to track real guardrails and Workspace media pointers, sync live campaigns via chat, or load the synthetic sample dataset.":
+    "請新增 Meta Ads 或 Google Ads 帳號以追蹤真實上限與工作區素材指標，在對話中同步線上活動，或載入示範資料。",
+  "tracked campaigns": "個已追蹤活動",
+  "Ask the assistant in chat to sync live campaigns into this workspace.":
+    "請在對話中請助理將線上廣告活動同步至此工作區。",
+  "active budget": "啟用中預算",
+  "No campaigns synced yet. Ask the assistant to sync Meta Ads or Google Ads.":
+    "尚未同步任何廣告活動。請在對話中請助理同步 Meta Ads 或 Google Ads。",
 };

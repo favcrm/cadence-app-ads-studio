@@ -267,14 +267,44 @@ export async function decideProposal(
   notifyWritten();
 }
 
+export async function createAdAccount(
+  scope: DisplayScope,
+  account: AdAccountProfile,
+): Promise<void> {
+  const suffix = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`;
+  const event: AuditEventProfile = {
+    event_key: `evt_${suffix}`,
+    kind: "sync",
+    summary: `Connected ${account.platform === "meta" ? "Meta Ads" : "Google Ads"} account ${account.display_name} (${account.external_account_id})`,
+    summary_zh: `已登記 ${account.platform === "meta" ? "Meta Ads" : "Google Ads"} 帳號 ${account.display_name}（${account.external_account_id}）`,
+    occurred_at: new Date().toISOString().slice(0, 16).replace("T", " "),
+  };
+  await serviceCall(scope, "records.batch", {
+    items: [
+      { table: "ad_accounts", record_id: `acct-${account.account_key}`, profile: account },
+      { table: "audit_events", record_id: `evt-${suffix}`, profile: event },
+    ],
+  });
+  notifyWritten();
+}
+
 export async function registerAssetPointer(
   scope: DisplayScope,
   asset: CreativeAssetProfile,
 ): Promise<void> {
-  await serviceCall(scope, "records.create", {
-    table: "creative_assets",
-    record_id: `ast-${asset.asset_key}`,
-    profile: asset,
+  const suffix = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`;
+  const event: AuditEventProfile = {
+    event_key: `evt_${suffix}`,
+    kind: "sync",
+    summary: `Registered Workspace creative pointer ${asset.name} (${asset.wiki_path})`,
+    summary_zh: `已登記工作區素材指標 ${asset.name}（${asset.wiki_path}）`,
+    occurred_at: new Date().toISOString().slice(0, 16).replace("T", " "),
+  };
+  await serviceCall(scope, "records.batch", {
+    items: [
+      { table: "creative_assets", record_id: `ast-${asset.asset_key}`, profile: asset },
+      { table: "audit_events", record_id: `evt-${suffix}`, profile: event },
+    ],
   });
   notifyWritten();
 }

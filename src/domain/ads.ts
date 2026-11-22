@@ -146,16 +146,289 @@ export function formatDuration(seconds: number | null): string {
   return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
+/** Count Google Ads RSA width: full-width/CJK codepoints count as 2, half-width as 1. */
+export function googleRsaHalfWidthLength(text: string): number {
+  let width = 0;
+  for (const ch of text) {
+    const cp = ch.codePointAt(0) ?? 0;
+    const isWide =
+      (cp >= 0x1100 && cp <= 0x115f) ||
+      (cp >= 0x2e80 && cp <= 0xa4cf && cp !== 0x303f) ||
+      (cp >= 0xac00 && cp <= 0xd7a3) ||
+      (cp >= 0xf900 && cp <= 0xfaff) ||
+      (cp >= 0xfe10 && cp <= 0xfe6f) ||
+      (cp >= 0xff00 && cp <= 0xff60) ||
+      (cp >= 0xffe0 && cp <= 0xffe6) ||
+      cp >= 0x20000;
+    width += isWide ? 2 : 1;
+  }
+  return width;
+}
+
 export function checkRsaLimits(
   headlines: readonly string[],
   descriptions: readonly string[],
 ): { ok: boolean; headlineViolations: number; descriptionViolations: number } {
-  const headlineViolations = headlines.filter((h) => h.length > 30).length;
-  const descriptionViolations = descriptions.filter((d) => d.length > 90).length;
+  const headlineViolations = headlines.filter((h) => googleRsaHalfWidthLength(h) > 30).length;
+  const descriptionViolations = descriptions.filter((d) => googleRsaHalfWidthLength(d) > 90).length;
   return {
     ok: headlineViolations === 0 && descriptionViolations === 0,
     headlineViolations,
     descriptionViolations,
+  };
+}
+
+const BANNED_SUPERLATIVE_RE = /(?:\b(?:best|#1|number\s*one|guaranteed)\b|最佳|第一|保證)/iu;
+
+export interface CopyPolicyLine {
+  text: string;
+  units: number;
+  chars: number;
+  ok: boolean;
+}
+
+export interface AdCopyPolicyEvaluation {
+  ok: boolean;
+  issues: string[];
+  headlineCounts: CopyPolicyLine[];
+  descriptionCounts: CopyPolicyLine[];
+}
+
+export function evaluateAdCopyPolicy(input: {
+  channel: "google_rsa" | "meta";
+  headlines: readonly string[];
+  descriptions: readonly string[];
+  primaryText?: string;
+}): AdCopyPolicyEvaluation {
+  const issues: string[] = [];
+  const headlineCounts: CopyPolicyLine[] = input.headlines.map((text, idx) => {
+    const units = googleRsaHalfWidthLength(text);
+    const chars = [...text].length;
+    const ok = text.trim().length > 0 && (input.channel === "meta" || units <= 30);
+    if (text.trim().length === 0) issues.push(`Headline ${idx + 1} is empty.`);
+    else if (input.channel === "google_rsa" && units > 30)
+      issues.push(`Headline ${idx + 1} exceeds 30 half-width units (${units}/30).`);
+    if (BANNED_SUPERLATIVE_RE.test(text))
+      issues.push(`Headline ${idx + 1} contains an unverified superlative.`);
+    return { text, units, chars, ok };
+  });
+
+  const descriptionCounts: CopyPolicyLine[] = input.descriptions.map((text, idx) => {
+    const units = googleRsaHalfWidthLength(text);
+    const chars = [...text].length;
+    const ok = text.trim().length > 0 && (input.channel === "meta" || units <= 90);
+    if (text.trim().length === 0) issues.push(`Description ${idx + 1} is empty.`);
+    else if (input.channel === "google_rsa" && units > 90)
+      issues.push(`Description ${idx + 1} exceeds 90 half-width units (${units}/90).`);
+    if (BANNED_SUPERLATIVE_RE.test(text))
+      issues.push(`Description ${idx + 1} contains an unverified superlative.`);
+    return { text, units, chars, ok };
+  });
+
+  if (input.primaryText !== undefined) {
+    if (input.primaryText.trim().length === 0) issues.push("Primary text is empty.");
+    else if (BANNED_SUPERLATIVE_RE.test(input.primaryText))
+      issues.push("Primary text contains an unverified superlative.");
+  }
+
+  return {
+    ok: issues.length === 0,
+    issues,
+    headlineCounts,
+    descriptionCounts,
+  };
+}
+
+export function accountCurrency(
+  accounts: readonly StoredRecord<AdAccountProfile>[],
+  accountKey?: string | null,
+): string {
+  if (accountKey) {
+    const match = accounts.find((a) => a.profile.account_key === accountKey);
+    if (match?.profile.currency) return match.profile.currency;
+  }
+  return accounts[0]?.profile.currency ?? "HKD";
+}
+
+export function isStarterDataset(campaigns: readonly StoredRecord<AdCampaignProfile>[]): boolean {
+  return campaigns.some(
+    (c) => c.profile.campaign_key === "cmp_meta_101" || c.profile.campaign_key === "cmp_google_201",
+  );
+}
+
+export interface ChannelPacingRow {
+  platform: Platform;
+  avgDailySpendMinor: number;
+  dailyBudgetMinor: number;
+  guardrailMinor: number;
+  spend7dMinor: number;
+}
+
+export function computeChannelPacing(
+  campaigns: readonly StoredRecord<AdCampaignProfile>[],
+  accounts: readonly StoredRecord<AdAccountProfile>[],
+): ChannelPacingRow[] {
+  return (["meta", "google"] as const)
+    .map((platform) => {
+      const chans = campaigns.filter((c) => c.profile.platform === platform);
+      const accts = accounts.filter((a) => a.profile.platform === platform);
+      if (chans.length === 0 && accts.length === 0) return null;
+      const spend7dMinor = chans.reduce((s, c) => s + c.profile.spend_7d_minor, 0);
+      const avgDailySpendMinor = Math.round(spend7dMinor / 7);
+      const dailyBudgetMinor = chans
+        .filter((c) => c.profile.status !== "PAUSED")
+        .reduce((s, c) => s + c.profile.daily_budget_minor, 0);
+      const guardrailMinor = accts.reduce((s, a) => s + a.profile.daily_guardrail_minor, 0);
+      return { platform, avgDailySpendMinor, dailyBudgetMinor, guardrailMinor, spend7dMinor };
+    })
+    .filter((row): row is ChannelPacingRow => row !== null);
+}
+
+export function validateAccountInput(input: {
+  platform: Platform;
+  external_account_id: string;
+  login_customer_id?: string | null;
+  display_name: string;
+  currency: string;
+  timezone: string;
+  daily_guardrail_minor: number;
+}): { ok: true; value: AdAccountProfile } | { ok: false; error: string } {
+  const ext = input.external_account_id.trim();
+  const mcc = input.login_customer_id?.trim() || null;
+  const name = input.display_name.trim();
+  const currency = input.currency.trim().toUpperCase();
+  const timezone = input.timezone.trim();
+
+  if (name.length < 1 || name.length > 120) {
+    return { ok: false, error: "Display name must be 1–120 characters." };
+  }
+  if (input.platform === "meta") {
+    if (!/^act_\d{4,24}$/.test(ext)) {
+      return { ok: false, error: "Meta ad account ID must match act_<digits>." };
+    }
+    if (mcc !== null) {
+      return { ok: false, error: "Meta accounts do not use a Google MCC ID." };
+    }
+  } else {
+    if (!/^\d{3}-?\d{3}-?\d{4}$/.test(ext)) {
+      return { ok: false, error: "Google customer ID must match 123-456-7890 (10 digits)." };
+    }
+    if (mcc !== null && !/^\d{3}-?\d{3}-?\d{4}$/.test(mcc)) {
+      return { ok: false, error: "Google MCC login_customer_id must match 123-456-7890." };
+    }
+  }
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    return { ok: false, error: "Currency must be a 3-letter ISO code (e.g. HKD, USD)." };
+  }
+  if (timezone.length < 1 || timezone.length > 64) {
+    return { ok: false, error: "Timezone is required." };
+  }
+  if (!Number.isInteger(input.daily_guardrail_minor) || input.daily_guardrail_minor < 10000) {
+    return { ok: false, error: "Daily guardrail must be at least 100 major units." };
+  }
+
+  const slug = ext.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  const accountKey = `${input.platform}_${slug}`.slice(0, 64);
+  return {
+    ok: true,
+    value: {
+      account_key: accountKey,
+      platform: input.platform,
+      external_account_id: ext,
+      login_customer_id: mcc,
+      display_name: name,
+      currency,
+      timezone,
+      status: "active",
+      daily_guardrail_minor: input.daily_guardrail_minor,
+      scopes_text:
+        input.platform === "meta"
+          ? "ads_read, ads_management (connected via Composio)"
+          : "adwords (connected via Composio · write gate active)",
+    },
+  };
+}
+
+const VALID_CREATIVE_MIMES: ReadonlySet<string> = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "video/mp4",
+]);
+
+export function validateCreativePointer(input: {
+  name: string;
+  media_kind: MediaKind;
+  mime: string;
+  dimensions: string;
+  duration_seconds: number | null;
+  size_bytes: number;
+  wiki_path: string;
+  sha256: string;
+  target_campaign: string;
+  platform_ref?: string;
+}): { ok: true; value: CreativeAssetProfile } | { ok: false; error: string } {
+  const name = input.name.trim();
+  const wikiPath = input.wiki_path.trim().replace(/^\/+/, "");
+  const sha = input.sha256.trim().toLowerCase();
+  const mime = input.mime.trim().toLowerCase();
+  const dimensions = input.dimensions.trim();
+  const target = input.target_campaign.trim();
+
+  if (name.length < 1 || name.length > 120) {
+    return { ok: false, error: "File name must be 1–120 characters." };
+  }
+  if (!VALID_CREATIVE_MIMES.has(mime)) {
+    return { ok: false, error: "MIME must be image/jpeg, image/png, image/webp, or video/mp4." };
+  }
+  if ((input.media_kind === "video") !== mime.startsWith("video/")) {
+    return { ok: false, error: "Media kind must match MIME type." };
+  }
+  if (
+    wikiPath.length < 3 ||
+    wikiPath.length > 200 ||
+    !/^(global|projects)\//.test(wikiPath) ||
+    wikiPath.includes("..") ||
+    /\s/.test(wikiPath)
+  ) {
+    return { ok: false, error: "Workspace path must start with global/ or projects/ with no '..' or spaces." };
+  }
+  if (!/^[0-9a-f]{64}$/.test(sha)) {
+    return { ok: false, error: "SHA-256 digest must be 64 lowercase hex characters." };
+  }
+  if (!Number.isInteger(input.size_bytes) || input.size_bytes <= 0) {
+    return { ok: false, error: "File size must be greater than 0 bytes." };
+  }
+  if (dimensions.length < 1 || dimensions.length > 32) {
+    return { ok: false, error: "Dimensions are required (e.g. 1080×1080)." };
+  }
+  if (target.length < 1 || target.length > 160) {
+    return { ok: false, error: "Target campaign is required." };
+  }
+
+  const cap = assetCapStatus(input.size_bytes);
+  const platformRef =
+    input.platform_ref?.trim() ||
+    (cap === "within_hosted"
+      ? "Workspace Files pointer (within 15 MiB hosted cap)"
+      : "Over 15 MiB hosted cap · use YouTube / R2 direct");
+
+  return {
+    ok: true,
+    value: {
+      asset_key: `ast_${sha.slice(0, 12)}`,
+      name,
+      media_kind: input.media_kind,
+      mime,
+      dimensions,
+      duration_seconds: input.media_kind === "video" ? input.duration_seconds : null,
+      size_bytes: input.size_bytes,
+      wiki_path: wikiPath,
+      sha256: sha,
+      sync_status: cap === "within_hosted" ? "workspace_only" : "over_hosted_cap",
+      target_campaign: target,
+      platform_ref: platformRef.slice(0, 160),
+    },
   };
 }
 
