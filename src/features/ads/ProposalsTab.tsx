@@ -115,7 +115,7 @@ export function ProposalsTab({
                   </span>
                   <StatusPill tone={overGuard ? "warn" : "ok"}>
                     {overGuard ? t("Exceeds guardrail") : t("Within guardrail")} (
-                    {fmtCompactMoney(guardMinor)})
+                    {fmtCompactMoney(guardMinor, acct?.currency ?? "HKD")})
                   </StatusPill>
                 </div>
 

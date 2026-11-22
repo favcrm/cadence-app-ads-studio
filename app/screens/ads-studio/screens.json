@@ -16,8 +16,8 @@
     {
       "name": "client.js",
       "media_type": "text/javascript",
-      "size": 138356,
-      "sha256": "sha256:81626e5772547cdc31289f2b767f7f98667218c1f349c16e55f69359ee9a500b"
+      "size": 157379,
+      "sha256": "sha256:824c9f7dc799abdf4095d39940cc3a024edb03e248592ffa5c1f7cfe8f07dac8"
     },
     {
       "name": "ads-studio.css",
@@ -27,7 +27,7 @@
     }
   ],
   "provenance": {
-    "source_digest": "sha256:a4e6e91ed9d99345e317b0fb475bde27133c71dc6aeebf4ce4cf4e6b6f36e159",
+    "source_digest": "sha256:228949f631d55a371042c333359281eebbb43592350cc88bd68a80fa39691fa5",
     "sdk_digest": "sha256:fd65c974511e63b3996e9fa7e438fb4e39df5f508d11636116ef150fcc123e35",
     "toolchain_digest": "sha256:e21cfc8222db408abe6ba5a482520639d9cf4b96481c19aff4b4246af8a65e42"
   },

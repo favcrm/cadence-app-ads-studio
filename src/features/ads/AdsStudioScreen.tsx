@@ -17,6 +17,7 @@ import { AdsLocaleProvider, useLocale } from "./locale";
 import { OverviewTab } from "./OverviewTab";
 import { ProposalsTab } from "./ProposalsTab";
 import {
+  createAdAccount,
   decideProposal,
   loadWorkspaceData,
   registerAssetPointer,
@@ -178,6 +179,7 @@ function Mounted() {
                   setBusySeed(false);
                 }
               }}
+              onAddAccount={() => setDrawer({ kind: "new_account" })}
               onGoSection={(section) => void patchRoute({ section, view: "list", record_id: null })}
               onInspectCampaign={(id) => {
                 const found = data.campaigns.find((c) => c.id === id);
@@ -189,6 +191,7 @@ function Mounted() {
           {route.section === "campaigns" && (
             <CampaignsTab
               campaigns={data.campaigns}
+              accounts={data.accounts}
               search={search}
               platformFilter={platformFilter}
               statusFilter={statusFilter}
@@ -235,6 +238,7 @@ function Mounted() {
             <AccountsTab
               accounts={data.accounts}
               canWrite={canWrite}
+              onAddAccount={() => setDrawer({ kind: "new_account" })}
               onSaveGuardrail={async (acct, dailyMinor) => {
                 await saveAccountGuardrail(scope, acct, dailyMinor);
                 await refresh();
@@ -253,6 +257,11 @@ function Mounted() {
                 await stageProposal(scope, input);
                 await refresh();
                 void patchRoute({ section: "proposals", view: "list", record_id: null });
+              }}
+              onCreateAccount={async (account) => {
+                await createAdAccount(scope, account);
+                await refresh();
+                void patchRoute({ section: "accounts", view: "list", record_id: null });
               }}
               onCreateAsset={async (asset) => {
                 await registerAssetPointer(scope, asset);

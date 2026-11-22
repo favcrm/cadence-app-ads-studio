@@ -5,11 +5,14 @@ import {
   formatBytesCompact,
   formatDuration,
   isCpaOutlier,
+  validateAccountInput,
+  validateCreativePointer,
   type AdAccountProfile,
   type AdCampaignProfile,
   type AuditEventProfile,
   type CreativeAssetProfile,
   type MediaKind,
+  type Platform,
   type ProposalActionType,
   type StoredRecord,
 } from "../../domain/ads";
@@ -21,6 +24,7 @@ import { StatusPill, statusTone } from "./StatusPill";
 export type ActiveDrawer =
   | { kind: "campaign"; record: StoredRecord<AdCampaignProfile> }
   | { kind: "new_campaign" }
+  | { kind: "new_account" }
   | { kind: "asset"; record: StoredRecord<CreativeAssetProfile> }
   | { kind: "new_asset" };
 
@@ -31,6 +35,7 @@ export function DetailDrawer({
   canWrite,
   onClose,
   onStageProposal,
+  onCreateAccount,
   onCreateAsset,
 }: {
   drawer: ActiveDrawer;
@@ -46,6 +51,7 @@ export function DetailDrawer({
     newBudgetMinor: number | null;
     rationale: string;
   }) => Promise<void>;
+  onCreateAccount: (account: AdAccountProfile) => Promise<void>;
   onCreateAsset: (asset: CreativeAssetProfile) => Promise<void>;
 }) {
   const { t } = useLocale();
@@ -129,6 +135,24 @@ export function DetailDrawer({
     );
   }
 
+  if (drawer.kind === "new_account") {
+    return (
+      <NewAccountDrawer
+        busy={busy}
+        onClose={onClose}
+        onSubmit={async (account) => {
+          setBusy(true);
+          try {
+            await onCreateAccount(account);
+            onClose();
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+    );
+  }
+
   if (drawer.kind === "new_campaign") {
     return (
       <NewCampaignDrawer
@@ -196,6 +220,7 @@ function CampaignDrawer({
   const [pending, setPending] = useState(false);
 
   const ctr = c.impressions_7d > 0 ? `${((c.clicks_7d / c.impressions_7d) * 100).toFixed(2)}%` : "—";
+  const currency = acct?.currency ?? "HKD";
 
   const handleStage = async (e: FormEvent) => {
     e.preventDefault();
@@ -227,11 +252,11 @@ function CampaignDrawer({
           <div className="ads-drawer-kpis">
             <div className="ads-drawer-kpi">
               <span className="text-micro text-ink-500">{t("7d Spend")}</span>
-              <strong className="num">{fmtMoney(c.spend_7d_minor)}</strong>
+              <strong className="num">{fmtMoney(c.spend_7d_minor, currency)}</strong>
             </div>
             <div className="ads-drawer-kpi">
               <span className="text-micro text-ink-500">{t("Budget/d")}</span>
-              <strong className="num">{fmtMoney(c.daily_budget_minor)}</strong>
+              <strong className="num">{fmtMoney(c.daily_budget_minor, currency)}</strong>
             </div>
             <div className="ads-drawer-kpi">
               <span className="text-micro text-ink-500">{t("Clicks & CTR")}</span>
@@ -242,7 +267,7 @@ function CampaignDrawer({
             <div className="ads-drawer-kpi">
               <span className="text-micro text-ink-500">{t("CPA")}</span>
               <strong className={`num ${isCpaOutlier(c.cpa_minor) ? "ads-cpa-warn" : ""}`}>
-                {fmtMoney(c.cpa_minor)}
+                {fmtMoney(c.cpa_minor, currency)}
               </strong>
             </div>
           </div>
@@ -292,13 +317,13 @@ function CampaignDrawer({
               key: "budget",
               header: t("Budget/d"),
               cellClassName: "ads-num-col num",
-              cell: (r) => fmtMoney(r.budgetMinor),
+              cell: (r) => fmtMoney(r.budgetMinor, currency),
             },
             {
               key: "spend",
               header: t("7d Spend"),
               cellClassName: "ads-num-col num",
-              cell: (r) => fmtMoney(r.spendMinor),
+              cell: (r) => fmtMoney(r.spendMinor, currency),
             },
           ]}
         />
@@ -329,10 +354,10 @@ function CampaignDrawer({
                 </Field>
                 {actionType === "budget_update" && (
                   <Field
-                    label={t("New daily budget (HKD)")}
+                    label={`${t("New daily budget")} (${currency})`}
                     hint={
                       acct
-                        ? `${t("Daily guardrail:")} ${fmtMoney(acct.daily_guardrail_minor)}`
+                        ? `${t("Daily guardrail:")} ${fmtMoney(acct.daily_guardrail_minor, currency)}`
                         : undefined
                     }
                   >
@@ -431,16 +456,19 @@ function NewCampaignDrawer({
   }) => Promise<void>;
 }) {
   const { t } = useLocale();
-  const [accountKey, setAccountKey] = useState(accounts[0]?.profile.account_key ?? "meta_hk_main");
-  const [name, setName] = useState("Holiday Tasting Box — HK Island");
+  const [accountKey, setAccountKey] = useState(accounts[0]?.profile.account_key ?? "");
+  const [name, setName] = useState("");
   const [budgetStr, setBudgetStr] = useState("500");
   const [rationale, setRationale] = useState(
     "Launch paused campaign for creative QA before owner activation.",
   );
+  const selectedAccount =
+    accounts.find((a) => a.profile.account_key === accountKey)?.profile ?? accounts[0]?.profile;
+  const currency = selectedAccount?.currency ?? "HKD";
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const account = accounts.find((a) => a.profile.account_key === accountKey)?.profile ?? accounts[0]?.profile;
+    const account = selectedAccount;
     const minor = parseMajorToMinor(budgetStr) ?? 50000;
     if (!account || !name.trim()) return;
     await onSubmit({
@@ -474,7 +502,7 @@ function NewCampaignDrawer({
                     onChange={setAccountKey}
                     options={accounts.map((a) => ({
                       value: a.profile.account_key,
-                      label: `${a.profile.platform === "meta" ? "Meta Ads" : "Google Ads"} · ${a.profile.external_account_id}`,
+                      label: `${a.profile.platform === "meta" ? "Meta Ads" : "Google Ads"} · ${a.profile.external_account_id} (${a.profile.currency})`,
                     }))}
                   />
                 )}
@@ -485,13 +513,14 @@ function NewCampaignDrawer({
                     id={id}
                     {...ctrl}
                     required
+                    placeholder="e.g. Spring Search — High Intent"
                     className="field"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
                 )}
               </Field>
-              <Field label={t("New daily budget (HKD)")}>
+              <Field label={`${t("New daily budget")} (${currency})`}>
                 {({ id, ...ctrl }) => (
                   <input
                     id={id}
@@ -533,6 +562,178 @@ function NewCampaignDrawer({
   );
 }
 
+function NewAccountDrawer({
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (account: AdAccountProfile) => Promise<void>;
+}) {
+  const { t } = useLocale();
+  const [platform, setPlatform] = useState<Platform>("meta");
+  const [displayName, setDisplayName] = useState("");
+  const [externalId, setExternalId] = useState("");
+  const [mccId, setMccId] = useState("");
+  const [currency, setCurrency] = useState("HKD");
+  const [timezone, setTimezone] = useState("Asia/Hong_Kong");
+  const [guardrailStr, setGuardrailStr] = useState("1500");
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const guardrailMinor = parseMajorToMinor(guardrailStr) ?? 0;
+    const res = validateAccountInput({
+      platform,
+      external_account_id: externalId,
+      login_customer_id: platform === "google" ? mccId : null,
+      display_name: displayName,
+      currency,
+      timezone,
+      daily_guardrail_minor: guardrailMinor,
+    });
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setError(null);
+    await onSubmit(res.value);
+  };
+
+  return (
+    <DrawerShell
+      kind={t("Ad Accounts")}
+      label={t("+ Add ad account")}
+      title={t("+ Add ad account")}
+      onClose={onClose}
+      tabs={[
+        {
+          id: "account",
+          label: t("Account Details"),
+          panel: (
+            <form className="ads-form-grid" onSubmit={handleSubmit}>
+              <Field label={t("Platform")}>
+                {() => (
+                  <Select
+                    aria-label={t("Platform")}
+                    value={platform}
+                    onChange={(v) => {
+                      const next = v as Platform;
+                      setPlatform(next);
+                      setError(null);
+                    }}
+                    options={[
+                      { value: "meta", label: t("Meta Ads") },
+                      { value: "google", label: t("Google Ads") },
+                    ]}
+                  />
+                )}
+              </Field>
+              <Field label={t("Display Name")}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    placeholder="e.g. Acme Studio — Performance"
+                    className="field"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field
+                label={t("External Account ID")}
+                hint={platform === "meta" ? "act_1234567890" : "123-456-7890"}
+              >
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    placeholder={platform === "meta" ? "act_1234567890" : "123-456-7890"}
+                    className="field num"
+                    value={externalId}
+                    onChange={(e) => setExternalId(e.target.value)}
+                  />
+                )}
+              </Field>
+              {platform === "google" && (
+                <Field label={t("Google MCC ID (optional)")} hint="123-456-7890">
+                  {({ id, ...ctrl }) => (
+                    <input
+                      id={id}
+                      {...ctrl}
+                      placeholder="123-456-7890"
+                      className="field num"
+                      value={mccId}
+                      onChange={(e) => setMccId(e.target.value)}
+                    />
+                  )}
+                </Field>
+              )}
+              <Field label={t("Currency")}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    maxLength={3}
+                    placeholder="HKD"
+                    className="field num"
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+                  />
+                )}
+              </Field>
+              <Field label={t("Timezone")}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    placeholder="Asia/Hong_Kong"
+                    className="field num"
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field label={`${t("Daily budget guardrail")} (${currency || "HKD"})`}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    type="number"
+                    min={100}
+                    step="any"
+                    required
+                    className="field num"
+                    value={guardrailStr}
+                    onChange={(e) => setGuardrailStr(e.target.value)}
+                  />
+                )}
+              </Field>
+              {error && (
+                <p role="alert" style={{ color: "var(--danger, #b91c1c)", fontSize: "13px", margin: 0 }}>
+                  {error}
+                </p>
+              )}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                <Button onClick={onClose}>{t("Cancel")}</Button>
+                <Button type="submit" variant="primary" loading={busy}>
+                  {t("Save")}
+                </Button>
+              </div>
+            </form>
+          ),
+        },
+      ]}
+    />
+  );
+}
+
 function NewAssetDrawer({
   accounts,
   busy,
@@ -545,36 +746,41 @@ function NewAssetDrawer({
   onSubmit: (asset: CreativeAssetProfile) => Promise<void>;
 }) {
   const { t } = useLocale();
-  const [name, setName] = useState("spring-latte-carousel.webp");
+  const [name, setName] = useState("");
   const [kind, setKind] = useState<MediaKind>("image");
+  const [mime, setMime] = useState("image/webp");
+  const [dimensions, setDimensions] = useState("1080×1080");
+  const [durationStr, setDurationStr] = useState("10");
   const [sizeMb, setSizeMb] = useState("1.8");
-  const [target, setTarget] = useState(
-    accounts[0]?.profile.display_name ?? "Single Origin Bean Subscription — Prospecting",
-  );
+  const [wikiPath, setWikiPath] = useState("global/ads-studio/assets/");
+  const [sha256, setSha256] = useState("");
+  const [target, setTarget] = useState(accounts[0]?.profile.display_name ?? "");
+  const [platformRef, setPlatformRef] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const bytes = Math.max(1024, Math.round((Number(sizeMb) || 1.2) * 1024 * 1024));
-    const cap = assetCapStatus(bytes);
-    const key = `ast_${Date.now().toString(36)}`;
-    const safeName = name.trim() || "creative.webp";
-    await onSubmit({
-      asset_key: key,
-      name: safeName,
+    const bytes = Math.round((Number(sizeMb) || 0) * 1024 * 1024);
+    const duration =
+      kind === "video" ? Math.max(1, Math.round(Number(durationStr) || 0)) : null;
+    const res = validateCreativePointer({
+      name,
       media_kind: kind,
-      mime: kind === "video" ? "video/mp4" : "image/webp",
-      dimensions: kind === "video" ? "1080×1920" : "1080×1080",
-      duration_seconds: kind === "video" ? 10 : null,
+      mime,
+      dimensions,
+      duration_seconds: duration,
       size_bytes: bytes,
-      wiki_path: `global/ads-studio/assets/${kind === "video" ? "videos" : "images"}/${safeName}`,
-      sha256: `${Date.now().toString(16).padEnd(64, "9").slice(0, 64)}`,
-      sync_status: cap === "within_hosted" ? "workspace_only" : "over_hosted_cap",
+      wiki_path: wikiPath,
+      sha256,
       target_campaign: target,
-      platform_ref:
-        cap === "within_hosted"
-          ? "Stored in Workspace Files (metadata pointer)"
-          : "Exceeds 15 MiB hosted cap · use YouTube / R2 direct",
+      platform_ref: platformRef,
     });
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setError(null);
+    await onSubmit(res.value);
   };
 
   return (
@@ -589,39 +795,131 @@ function NewAssetDrawer({
           label: t("Workspace Media Library"),
           panel: (
             <form className="ads-form-grid" onSubmit={handleSubmit}>
-              <Field label="File Name">
+              <Field label={t("File Name")}>
                 {({ id, ...ctrl }) => (
                   <input
                     id={id}
                     {...ctrl}
                     required
+                    placeholder="spring-hero.webp"
                     className="field"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                      const nextName = e.target.value;
+                      setName(nextName);
+                      if (
+                        wikiPath === "global/ads-studio/assets/" ||
+                        wikiPath.startsWith("global/ads-studio/assets/images/") ||
+                        wikiPath.startsWith("global/ads-studio/assets/videos/")
+                      ) {
+                        const folder = kind === "video" ? "videos" : "images";
+                        setWikiPath(`global/ads-studio/assets/${folder}/${nextName.trim()}`);
+                      }
+                    }}
                   />
                 )}
               </Field>
-              <Field label="Media Kind">
+              <Field label={t("Media Kind")}>
                 {() => (
                   <Select
-                    aria-label="Media Kind"
+                    aria-label={t("Media Kind")}
                     value={kind}
-                    onChange={(v) => setKind(v as MediaKind)}
+                    onChange={(v) => {
+                      const next = v as MediaKind;
+                      setKind(next);
+                      setMime(next === "video" ? "video/mp4" : "image/webp");
+                      setDimensions(next === "video" ? "1080×1920" : "1080×1080");
+                    }}
                     options={[
                       { value: "image", label: `${t("Images")} (webp / jpg / png)` },
-                      { value: "video", label: `${t("Videos")} (mp4 / webm)` },
+                      { value: "video", label: `${t("Videos")} (mp4)` },
                     ]}
                   />
                 )}
               </Field>
-              <Field label="File Size (MB)">
+              <Field label={t("MIME Type")}>
+                {() => (
+                  <Select
+                    aria-label={t("MIME Type")}
+                    value={mime}
+                    onChange={setMime}
+                    options={
+                      kind === "video"
+                        ? [{ value: "video/mp4", label: "video/mp4" }]
+                        : [
+                            { value: "image/webp", label: "image/webp" },
+                            { value: "image/jpeg", label: "image/jpeg" },
+                            { value: "image/png", label: "image/png" },
+                          ]
+                    }
+                  />
+                )}
+              </Field>
+              <Field label={t("Workspace Path")} hint="global/ads-studio/assets/...">
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    placeholder="global/ads-studio/assets/images/spring-hero.webp"
+                    className="field num"
+                    value={wikiPath}
+                    onChange={(e) => setWikiPath(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field label={t("SHA-256 Digest")} hint={t("From wiki_list media discovery")}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    maxLength={64}
+                    placeholder="64-character hex digest"
+                    className="field num"
+                    value={sha256}
+                    onChange={(e) => setSha256(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field label={t("Dimensions")}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    placeholder="1080×1080"
+                    className="field num"
+                    value={dimensions}
+                    onChange={(e) => setDimensions(e.target.value)}
+                  />
+                )}
+              </Field>
+              {kind === "video" && (
+                <Field label={t("Duration (s)")}>
+                  {({ id, ...ctrl }) => (
+                    <input
+                      id={id}
+                      {...ctrl}
+                      type="number"
+                      min={1}
+                      step={1}
+                      required
+                      className="field num"
+                      value={durationStr}
+                      onChange={(e) => setDurationStr(e.target.value)}
+                    />
+                  )}
+                </Field>
+              )}
+              <Field label={t("File Size (MB)")}>
                 {({ id, ...ctrl }) => (
                   <input
                     id={id}
                     {...ctrl}
                     type="number"
-                    min={0.1}
-                    step={0.1}
+                    min={0.01}
+                    step="any"
                     required
                     className="field num"
                     value={sizeMb}
@@ -635,12 +933,30 @@ function NewAssetDrawer({
                     id={id}
                     {...ctrl}
                     required
+                    placeholder="e.g. Spring Brand Prospecting"
                     className="field"
                     value={target}
                     onChange={(e) => setTarget(e.target.value)}
                   />
                 )}
               </Field>
+              <Field label={t("Ad Platform Ref (optional)")}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    placeholder="Meta image_hash or Google Asset resource"
+                    className="field num"
+                    value={platformRef}
+                    onChange={(e) => setPlatformRef(e.target.value)}
+                  />
+                )}
+              </Field>
+              {error && (
+                <p role="alert" style={{ color: "var(--danger, #b91c1c)", fontSize: "13px", margin: 0 }}>
+                  {error}
+                </p>
+              )}
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
                 <Button onClick={onClose}>{t("Cancel")}</Button>
                 <Button type="submit" variant="primary" loading={busy}>
