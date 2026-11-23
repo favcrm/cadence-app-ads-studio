@@ -1,7 +1,7 @@
 ---
 app: ads-studio
 title: Ads Studio
-version: '0.4.0'
+version: '0.5.0'
 summary: Cross-channel Meta Ads and Google Ads console for spend guardrails, owner-approved changes, and Workspace media pointers.
 needs:
   connections: []
@@ -14,8 +14,9 @@ listing:
   icon: assets/ads-studio.svg
   publisher:
     name: Cadence
-  about: Ads Studio brings Meta Ads and Google Ads campaigns into one Cadence workspace. Pin real Meta Ads ad accounts and Google Ads customer IDs in Settings Connections, track daily spend guardrails, sync live 7-day spend and split conversions via Composio connectors, spot CPA outliers, review staged proposals before they apply, check CJK half-width Google RSA and Meta ad copy rules, and deliver creatives via signed Workspace Files URLs or YouTube video IDs.
+  about: Ads Studio brings Meta Ads and Google Ads campaigns into one Cadence workspace. Authorize and pin Meta Ads or Google Ads accounts in Settings Connections, import them directly in Add Ad Account via owner-only connections.assets discovery, track daily spend guardrails, sync live 7-day spend and split conversions via Composio connectors, spot CPA outliers, review staged proposals before they apply, check CJK half-width Google RSA and Meta ad copy rules, and deliver creatives via signed Workspace Files URLs or YouTube video IDs.
   can:
+    - Import authorized Meta and Google Ads accounts directly from Composio OAuth connections
     - Track Meta Ads and Google Ads campaigns with separate conversion reporting
     - Enforce daily spend guardrails and highlight high-CPA outliers
     - Stage campaign, budget, and status changes for explicit owner approval
@@ -34,6 +35,12 @@ listing:
       tagline: 統一檢視 Meta 與 Google 廣告支出並以負責人審批控管變更
       summary: 在同一工作區追蹤 Meta 與 Google 廣告活動、設定每日支出護欄、審批預算與狀態調整，並管理工作區素材指標。
   changes:
+    - version: '0.5.0'
+      notes:
+        - Pick authorized Meta and Google Ads accounts directly from Composio OAuth connections
+        - Auto-fill display name, external ID, currency, and timezone from Settings Connections
+        - Keep manual ad account entry as a collapsible fallback when connections are unavailable
+      keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
     - version: '0.4.0'
       notes:
         - Support host Settings Connections ad-account pinning and read-only campaign sync
@@ -78,7 +85,7 @@ Account selection (`Settings -> Connections` asset pinning) and qualified media 
 
 ## Assistant access
 
-The assistant reads and stages records through the five `screen-records.v1` verbs declared by `screens/ads-studio/screens.json`: `records.list`, `records.show`, `records.create`, `records.update`, and `records.batch`. All tables require owner reads, and staged writes await explicit owner approval before committing.
+The assistant reads and stages records through the five `records.*` verbs (`records.list`, `records.show`, `records.create`, `records.update`, and `records.batch`) declared by `screens/ads-studio/screens.json`. The UI screen also declares owner-only `connections.assets` so the onboarding drawer can list authorized Composio ad accounts without ever reading OAuth credentials. All tables require owner reads, and staged writes await explicit owner approval before committing.
 
 Five bundled skills under `skills/` guide assistant workflows:
 - `ads-operator` — routes paid-acquisition questions and enforces owner-approval, multi-currency minor-unit, and separated-conversion rules

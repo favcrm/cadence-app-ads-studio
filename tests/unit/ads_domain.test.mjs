@@ -18,6 +18,14 @@ import {
   validateAccountInput,
   validateCreativePointer,
 } from "../../src/domain/ads.ts";
+import {
+  deriveDisplayNameFromAsset,
+  flattenSelectableConnectedAssets,
+  normalizeExternalAccountId,
+  normalizeGoogleCustomerId,
+  parseConnectedAssetsReply,
+  pickPreferredConnectedAsset,
+} from "../../src/features/ads/records.ts";
 import { fmtCompactMoney, fmtMoney, parseMajorToMinor } from "../../src/domain/money.ts";
 
 describe("money formatting and parsing", () => {
@@ -311,5 +319,89 @@ describe("ads domain guardrails and split reporting", () => {
         spend7dMinor: 700000,
       },
     ]);
+  });
+
+  test("Composio OAuth connected asset helpers normalize IDs, pick pinned non-duplicate accounts, and parse replies", () => {
+    expect(normalizeGoogleCustomerId("7925441166")).toBe("792-544-1166");
+    expect(normalizeGoogleCustomerId("customers/7925441166")).toBe("792-544-1166");
+    expect(normalizeGoogleCustomerId("792-544-1166")).toBe("792-544-1166");
+    expect(normalizeExternalAccountId("meta", "872629204289636")).toBe("act_872629204289636");
+
+    expect(
+      deriveDisplayNameFromAsset({ value: "act_872629204289636", label: "FavCRM.io — act_872629204289636" }, "meta"),
+    ).toBe("FavCRM.io");
+    expect(
+      deriveDisplayNameFromAsset({ value: "792-544-1166", label: "FavCRM (7925441166)" }, "google"),
+    ).toBe("FavCRM");
+
+    const parsed = parseConnectedAssetsReply(
+      {
+        toolkit: "metaads",
+        connected: true,
+        connections: [
+          {
+            connection_id: "conn_meta_1",
+            account: "chris@favcrm.io",
+            kind: "meta_ad_account",
+            selected: "act_872629204289636",
+            assets: [
+              {
+                value: "act_1111111111",
+                label: "Legacy Brand — act_1111111111",
+                permission: "active",
+                selectable: true,
+                currency: "USD",
+                timezone: "America/Los_Angeles",
+              },
+              {
+                value: "act_872629204289636",
+                label: "FavCRM.io — act_872629204289636",
+                permission: "active",
+                selectable: true,
+                currency: "HKD",
+                timezone: "Asia/Hong_Kong",
+              },
+              {
+                value: "act_2222222222",
+                label: "Disabled Account",
+                permission: "disabled",
+                selectable: false,
+              },
+            ],
+          },
+        ],
+      },
+      "meta",
+    );
+
+    const options = flattenSelectableConnectedAssets(parsed, "meta", []);
+    expect(options).toHaveLength(2);
+    expect(pickPreferredConnectedAsset(options)?.normalizedExternalId).toBe("act_872629204289636");
+
+    const existing = [
+      {
+        id: "acct-1",
+        revision: 1,
+        profile: {
+          account_key: "meta_act_872629204289636",
+          platform: "meta",
+          external_account_id: "act_872629204289636",
+          login_customer_id: null,
+          display_name: "FavCRM.io",
+          currency: "HKD",
+          timezone: "Asia/Hong_Kong",
+          status: "active",
+          daily_guardrail_minor: 150000,
+          scopes_text: "ads_read",
+        },
+      },
+    ];
+    const withExisting = flattenSelectableConnectedAssets(parsed, "meta", existing);
+    expect(withExisting.find((o) => o.normalizedExternalId === "act_872629204289636")?.alreadyAdded).toBe(true);
+    expect(pickPreferredConnectedAsset(withExisting)?.normalizedExternalId).toBe("act_1111111111");
+
+    const disconnected = parseConnectedAssetsReply({ toolkit: "googleads", connected: false, connections: [] }, "google");
+    expect(disconnected.connected).toBe(false);
+    expect(disconnected.connections).toEqual([]);
   });
 });

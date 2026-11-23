@@ -53,6 +53,9 @@ export interface CallArgs {
   "records.batch": {
     items: BatchItemArgs[];
   };
+  "connections.assets": {
+    toolkit: "metaads" | "googleads";
+  };
   "screen.route.patch": {
     section?: Section;
     view?: "list" | "new";
@@ -69,6 +72,7 @@ export const CALL_FIELDS: Record<keyof CallArgs, readonly string[]> = {
   "records.create": ["table", "record_id", "profile"],
   "records.update": ["table", "record_id", "expected_revision", "profile"],
   "records.batch": ["items"],
+  "connections.assets": ["toolkit"],
   "screen.route.patch": ["section", "view", "record_id", "segment_id", "params", "replace"],
 };
 
