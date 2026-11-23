@@ -940,12 +940,15 @@ function NewAssetDrawer({
                   />
                 )}
               </Field>
-              <Field label={t("Ad Platform Ref (optional)")}>
+              <Field
+                label={t("Ad Platform Ref (optional)")}
+                hint={t("Leave empty for /api/wiki/media/sign, or enter a YouTube URL / youtube_video_id:<id>")}
+              >
                 {({ id, ...ctrl }) => (
                   <input
                     id={id}
                     {...ctrl}
-                    placeholder="Meta image_hash or Google Asset resource"
+                    placeholder="youtube_video_id:dQw4w9WgXcQ / meta_image_hash"
                     className="field num"
                     value={platformRef}
                     onChange={(e) => setPlatformRef(e.target.value)}

@@ -168,7 +168,7 @@ export function CreativesTab({
           <h3 className="text-cardtitle">{t("Workspace Media Library")}</h3>
           <span className="text-micro text-ink-500 num">
             {t(
-              "Images & videos under global/ads-studio/assets/ · app-storage/v1 holds metadata + sha256 pointers only",
+              "Images & videos under global/ads-studio/assets/ · signed up to 15 MiB via /api/wiki/media/sign (or youtube_video_id:<id>)",
             )}
           </span>
         </div>
@@ -209,7 +209,7 @@ export function CreativesTab({
           <div style={{ display: "grid", gap: "10px" }}>
             <p style={{ margin: 0 }}>
               {t(
-                "Upload images or MP4 cuts into Workspace Files (global/ads-studio/assets/), then ask the assistant to scan wiki_list media or register a pointer manually.",
+                "Upload images or MP4 cuts into Workspace Files (global/ads-studio/assets/) for temporary signed delivery (<= 15 MiB), or link a YouTube video ID (youtube_video_id:<id>) for > 15 MiB Google Ads videos.",
               )}
             </p>
             {canWrite && (

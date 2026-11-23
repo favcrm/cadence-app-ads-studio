@@ -26,7 +26,7 @@ export function AccountsTab({
           <h3 className="text-cardtitle">{t("Composio connections & pinned ad accounts")}</h3>
           <span className="text-micro text-ink-500">
             {t(
-              "Credentials remain host-owned; ad-account pins and daily guardrails store in app-storage/v1.",
+              "Host credentials and pinned Meta / Google Ads accounts live in Settings → Connections; daily guardrails store in app-storage/v1.",
             )}
           </span>
         </div>
@@ -40,7 +40,7 @@ export function AccountsTab({
       {accounts.length === 0 ? (
         <article className="ads-card">
           <div className="text-secondary text-ink-300">
-            {t("No ad accounts pinned in this workspace yet. Add an account ID or connect Meta Ads / Google Ads in chat.")}
+            {t("No ad accounts pinned in this workspace yet. Pin a Meta Ads ad account or Google Ads customer ID in Settings → Connections, then add it or sync in chat.")}
           </div>
         </article>
       ) : (
