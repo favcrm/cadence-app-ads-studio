@@ -40,6 +40,7 @@ listing:
         - Pick authorized Meta and Google Ads accounts directly from Composio OAuth connections
         - Auto-fill display name, external ID, currency, and timezone from Settings Connections
         - Keep manual ad account entry as a collapsible fallback when connections are unavailable
+        - Declare canvas views in screens.json for filtered overview, campaign audit, and campaign-by-id views
       keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
     - version: '0.4.0'
       notes:
@@ -90,6 +91,6 @@ The assistant reads and stages records through the five `records.*` verbs (`reco
 Five bundled skills under `skills/` guide assistant workflows:
 - `ads-operator` — routes paid-acquisition questions and enforces owner-approval, multi-currency minor-unit, and separated-conversion rules
 - `ads-sync` — checks `metaads`/`googleads` OAuth status, normalizes live campaign & 7-day insights (`cost_micros / 10000` for Google), and batch-writes `ad_accounts`/`ad_campaigns`/`audit_events`
-- `spend-audit` — read-only spend pacing, CPA outlier, pending-proposal, and audit-log inspection via paginated `records.list` / `records.show` reads and section-based `canvas_open` views
+- `spend-audit` — read-only spend pacing, CPA outlier, pending-proposal, and audit-log inspection via paginated `records.list` / `records.show` reads and declared `canvas_open` views with typed range, platform, status, and campaign filters
 - `spend-proposal` — validates guardrails, stages one `pending` change in `ad_proposals`, and triggers qualified host `connected_effect` confirmation cards via `use_tool` when linked
 - `creative-audit` — discovers Workspace media via `wiki_list({ media: "all" })`, registers verified `creative_assets` pointers (`15 MiB` hosted / `100 MB` native), and audits CJK half-width Google RSA / Meta ad copy against `rubrics/ad-policy.md`

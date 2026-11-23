@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { TextDecoder } from "node:util";
+import { views } from "./ads_views.mjs";
 import {
   root,
   hash,
@@ -48,6 +49,7 @@ exact(
     "tools",
     "operations",
     "navigation",
+    "views",
   ],
   ["remote_images", "startup"],
 );
@@ -98,6 +100,55 @@ const expectedNavigation = {
 };
 if (JSON.stringify(decl.navigation) !== JSON.stringify(expectedNavigation)) {
   fail("Ads Studio navigation mismatch");
+}
+if (JSON.stringify(decl.views) !== JSON.stringify(views)) {
+  fail("Ads Studio views mismatch");
+}
+if (!Array.isArray(decl.views) || decl.views.length === 0 || decl.views.length > 20) {
+  fail("Ads Studio views count out of bounds");
+}
+if (new Set(decl.views.map((v) => v.id)).size !== decl.views.length) {
+  fail("Duplicate Ads Studio view id");
+}
+for (const view of decl.views) {
+  exact(view, ["id", "label", "section", "params"], ["record_id"]);
+  if (
+    !/^[a-z0-9_-]{1,32}$/.test(view.id) ||
+    !expectedNavigation.sections.some((s) => s.id === view.section)
+  ) {
+    fail(`Ads Studio view ${view.id} is malformed`);
+  }
+  const locales = Object.entries(view.label);
+  if (
+    !locales.length ||
+    locales.length > 8 ||
+    !view.label.en ||
+    !view.label["zh-TW"] ||
+    locales.some(([, text]) => typeof text !== "string" || !text.trim() || text.length > 60)
+  ) {
+    fail(`Ads Studio view ${view.id} label is malformed`);
+  }
+  const paramNames = Object.keys(view.params);
+  if (paramNames.length > 6 || paramNames.some((n) => !/^[a-z_]{1,24}$/.test(n))) {
+    fail(`Ads Studio view ${view.id} params are malformed`);
+  }
+  for (const param of Object.values(view.params)) {
+    if (
+      !["date", "string", "enum"].includes(param.type) ||
+      (param.type === "enum" &&
+        !(
+          Array.isArray(param.values) &&
+          param.values.length >= 1 &&
+          param.values.length <= 20 &&
+          new Set(param.values).size === param.values.length &&
+          param.values.every(
+            (v) => typeof v === "string" && v.trim().length > 0 && v.length <= 200,
+          )
+        ))
+    ) {
+      fail(`Ads Studio view ${view.id} param is malformed`);
+    }
+  }
 }
 
 const media = {

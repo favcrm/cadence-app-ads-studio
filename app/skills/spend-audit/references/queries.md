@@ -47,11 +47,12 @@ All five tables enforce `read_role: "owner"`. All list reads use `records.list` 
 
 ## Opening Ads Studio on screen (`canvas_open`)
 
-Declared navigation sections in `screens/ads-studio/screens.json`:
-- `overview` — 7-day summary cards, channel conversion split, spend pacing vs guardrails
-- `campaigns` — campaign table with platform/status filters and ad-set drawer
+Declared navigation sections and views in `screens/ads-studio/screens.json`:
+- `overview` — 7-day summary cards, channel conversion split, spend pacing vs guardrails (`params`: `range` `7d|30d|month`, `platform` `all|meta|google`)
+- `campaigns` / `campaign_audit` — campaign table with filters and ad-set drawer (`params`: `range`, `platform`, `status` `all|ACTIVE|PAUSED|LIMITED`, `q`)
+- `campaign` — opens the campaign detail drawer for `id` (`section: "campaigns"`, `params`: `id`)
 - `proposals` — staged changes awaiting owner approval
 - `creatives` — Workspace Media asset pointers and copy specs
 - `accounts` — Meta/Google account connections and daily guardrails
 
-Pass only `app: "ads-studio"`, `section`, and optional `record_id` / `title` to `canvas_open`. Do **not** pass `view` or `params` (no `views` catalog is declared on `ads-studio`). If the user asked for a specific `range`, `platform`, or `status`, tell them in one line that the view opened with its default filters so they can adjust it on screen.
+Pass `app: "ads-studio"` with `view` (or `section`) and validated `params` (plus optional `record_id` / `title`) to `canvas_open`.

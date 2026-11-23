@@ -16,8 +16,8 @@
     {
       "name": "client.js",
       "media_type": "text/javascript",
-      "size": 169871,
-      "sha256": "sha256:54838b9dc9dc7e70f15fb9f91bba2b7303d275281a521dd802e9870a92b4bd11"
+      "size": 170374,
+      "sha256": "sha256:45af4ae1d7ace3302d30baa6ebc4733714e257ccb7e61ff6e44043a4c619420f"
     },
     {
       "name": "ads-studio.css",
@@ -27,7 +27,7 @@
     }
   ],
   "provenance": {
-    "source_digest": "sha256:d3177661fe9270ae41eab56ce893b338eb5d87d4252d477fe910110f5d4eb146",
+    "source_digest": "sha256:c762bebed3cf35695e0c0f4d542599dec731ed52ecbe2f71b243d564567fd95e",
     "sdk_digest": "sha256:fd65c974511e63b3996e9fa7e438fb4e39df5f508d11636116ef150fcc123e35",
     "toolchain_digest": "sha256:e21cfc8222db408abe6ba5a482520639d9cf4b96481c19aff4b4246af8a65e42"
   },
@@ -94,5 +94,149 @@
         }
       }
     ]
-  }
+  },
+  "views": [
+    {
+      "id": "overview",
+      "label": {
+        "en": "Overview",
+        "zh-TW": "總覽"
+      },
+      "section": "overview",
+      "params": {
+        "range": {
+          "type": "enum",
+          "values": [
+            "7d",
+            "30d",
+            "month"
+          ]
+        },
+        "platform": {
+          "type": "enum",
+          "values": [
+            "all",
+            "meta",
+            "google"
+          ]
+        }
+      }
+    },
+    {
+      "id": "campaigns",
+      "label": {
+        "en": "Campaigns",
+        "zh-TW": "廣告活動"
+      },
+      "section": "campaigns",
+      "params": {
+        "range": {
+          "type": "enum",
+          "values": [
+            "7d",
+            "30d",
+            "month"
+          ]
+        },
+        "platform": {
+          "type": "enum",
+          "values": [
+            "all",
+            "meta",
+            "google"
+          ]
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "all",
+            "ACTIVE",
+            "PAUSED",
+            "LIMITED"
+          ]
+        },
+        "q": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "id": "campaign_audit",
+      "label": {
+        "en": "Campaign audit",
+        "zh-TW": "廣告活動稽核"
+      },
+      "section": "campaigns",
+      "params": {
+        "range": {
+          "type": "enum",
+          "values": [
+            "7d",
+            "30d",
+            "month"
+          ]
+        },
+        "platform": {
+          "type": "enum",
+          "values": [
+            "all",
+            "meta",
+            "google"
+          ]
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "all",
+            "ACTIVE",
+            "PAUSED",
+            "LIMITED"
+          ]
+        },
+        "q": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "id": "campaign",
+      "label": {
+        "en": "Campaign by id",
+        "zh-TW": "指定廣告活動"
+      },
+      "section": "campaigns",
+      "params": {
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "id": "proposals",
+      "label": {
+        "en": "Changes",
+        "zh-TW": "變更提案"
+      },
+      "section": "proposals",
+      "params": {}
+    },
+    {
+      "id": "creatives",
+      "label": {
+        "en": "Creatives",
+        "zh-TW": "廣告素材"
+      },
+      "section": "creatives",
+      "params": {}
+    },
+    {
+      "id": "accounts",
+      "label": {
+        "en": "Accounts",
+        "zh-TW": "帳號與連線"
+      },
+      "section": "accounts",
+      "params": {}
+    }
+  ]
 }

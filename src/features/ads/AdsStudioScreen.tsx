@@ -66,6 +66,7 @@ function Mounted() {
 
   const [drawer, setDrawer] = useState<ActiveDrawer | null>(null);
   const [modalProposal, setModalProposal] = useState<StoredRecord<AdProposalProfile> | null>(null);
+  const openedRouteTarget = useRef<string | null>(null);
 
   useEffect(() => {
     if (snapshot) return;
@@ -84,6 +85,9 @@ function Mounted() {
     if (params.status && ["all", "ACTIVE", "PAUSED", "LIMITED"].includes(params.status)) {
       setStatusFilter(params.status as "all" | CampaignStatus);
     }
+    if (typeof params.q === "string") {
+      setSearch(params.q);
+    }
   }, [paramsKey]);
 
   const refresh = useCallback(async () => {
@@ -100,6 +104,32 @@ function Mounted() {
   useEffect(() => {
     if (snapshot) void refresh();
   }, [refresh, snapshot]);
+
+  const routeTargetId =
+    snapshot?.route.params?.id?.trim() || snapshot?.route.record_id?.trim() || "";
+  const routeSection = snapshot?.route.section ?? "overview";
+  useEffect(() => {
+    if (!data || !routeTargetId) return;
+    const targetKey = `${routeSection}:${routeTargetId}`;
+    if (openedRouteTarget.current === targetKey) return;
+    if (routeSection === "campaigns") {
+      const found = data.campaigns.find(
+        (c) => c.id === routeTargetId || c.profile.campaign_key === routeTargetId,
+      );
+      if (found) {
+        openedRouteTarget.current = targetKey;
+        setDrawer({ kind: "campaign", record: found });
+      }
+    } else if (routeSection === "creatives") {
+      const found = data.assets.find(
+        (a) => a.id === routeTargetId || a.profile.asset_key === routeTargetId,
+      );
+      if (found) {
+        openedRouteTarget.current = targetKey;
+        setDrawer({ kind: "asset", record: found });
+      }
+    }
+  }, [data, routeSection, routeTargetId]);
 
   const loadConnectedAssetsForPlatform = useCallback(
     (platform: Platform) => {

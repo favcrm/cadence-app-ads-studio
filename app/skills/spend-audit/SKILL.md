@@ -19,7 +19,7 @@ Exact table names, column schemas, pagination patterns, and canvas opening rules
    - Quote `currency` on every monetary figure and convert integer `*_minor` values explicitly (for two-decimal currencies such as `HKD`, divide by `100`, so `250000` is `HK$2,500.00`).
    - Compare account/campaign `daily_budget_minor` against the owning account's `daily_guardrail_minor` and flag any campaign with `status: "LIMITED"` or `cpa_minor > 18000` (above HK$180.00 default outlier threshold, or the owner's stated threshold).
    - Keep `google_conversions` separate from Meta's `meta_actions_json` entries (`[{actionType, value}]`), and show each Meta `actionType` separately rather than summing purchases and leads together.
-6. When showing the screen helps the owner inspect details visually, call `canvas_open` with `app: "ads-studio"` and `section` (`overview`, `campaigns`, `proposals`, `creatives`, or `accounts`) plus optional `record_id` / `title`. Do **not** pass `view` or `params`; if the owner asked for a specific range (`7d`, `30d`, `month`), `platform`, or `status`, state in one short line that the section opened at its default filters and can be switched on screen.
+6. When showing the screen helps the owner inspect details visually, call `canvas_open` with `app: "ads-studio"` and a declared `view` (`overview`, `campaigns`, `campaign_audit`, `campaign`, `proposals`, `creatives`, or `accounts`) plus validated `params` (`range`: `7d|30d|month`, `platform`: `all|meta|google`, `status`: `all|ACTIVE|PAUSED|LIMITED`, `q`, or `id` for `campaign`) and optional `record_id` / `title`.
 
 ## Rules that do not bend
 

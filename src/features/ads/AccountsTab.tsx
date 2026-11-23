@@ -168,8 +168,8 @@ export function AccountsTab({
             ))}
           </div>
           <div className="text-micro text-ink-400 num">
-            Declared views in screens.json: campaign_audit (section=campaigns, params: range,
-            platform, status) · overview_range (section=overview, params: range, platform)
+            Declared views in screens.json: overview (range, platform) · campaigns / campaign_audit
+            (range, platform, status, q) · campaign (id) · proposals · creatives · accounts
           </div>
         </div>
       </details>
