@@ -74,12 +74,12 @@ export function operationInventory() {
     service.indexOf("export const CALL_FIELDS"),
     service.indexOf("export const OPERATIONS"),
   );
-  const operations = [...table.matchAll(/"(records\.[a-z]+|connections\.assets)":/g)].map(
+  const operations = [...table.matchAll(/"(records\.[a-z]+|connections\.(?:assets|connect))":/g)].map(
     (m) => m[1],
   );
-  if (operations.length !== 6 || new Set(operations).size !== operations.length) {
+  if (operations.length !== 7 || new Set(operations).size !== operations.length) {
     throw new Error(
-      "Closed operation inventory must contain 6 distinct screen service operations",
+      "Closed operation inventory must contain 7 distinct screen service operations",
     );
   }
   return operations;

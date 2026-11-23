@@ -21,11 +21,13 @@ import {
 import {
   deriveDisplayNameFromAsset,
   flattenSelectableConnectedAssets,
+  mergePlatformAccounts,
   normalizeExternalAccountId,
   normalizeGoogleCustomerId,
   parseConnectedAssetsReply,
   pickPreferredConnectedAsset,
 } from "../../src/features/ads/records.ts";
+import { CALL_FIELDS, cleanArgs } from "../../src/bridge/services.ts";
 import { fmtCompactMoney, fmtMoney, parseMajorToMinor } from "../../src/domain/money.ts";
 
 describe("money formatting and parsing", () => {
@@ -402,6 +404,104 @@ describe("ads domain guardrails and split reporting", () => {
 
     const disconnected = parseConnectedAssetsReply({ toolkit: "googleads", connected: false, connections: [] }, "google");
     expect(disconnected.connected).toBe(false);
+    expect(disconnected.needs_reconnect).toBe(false);
     expect(disconnected.connections).toEqual([]);
+
+    const expired = parseConnectedAssetsReply(
+      { toolkit: "metaads", connected: false, needs_reconnect: true, connections: [] },
+      "meta",
+    );
+    expect(expired.needs_reconnect).toBe(true);
+  });
+
+  test("mergePlatformAccounts reconciles saved enabled/disabled accounts with discovered connections", () => {
+    const saved = [
+      {
+        id: "acct-saved-meta",
+        revision: 2,
+        profile: {
+          account_key: "meta_act_111",
+          platform: "meta",
+          external_account_id: "act_111",
+          login_customer_id: null,
+          display_name: "Saved Active Meta",
+          currency: "HKD",
+          timezone: "Asia/Hong_Kong",
+          status: "active",
+          daily_guardrail_minor: 200000,
+          scopes_text: "ads_read",
+        },
+      },
+      {
+        id: "acct-saved-google",
+        revision: 1,
+        profile: {
+          account_key: "google_792_544_1166",
+          platform: "google",
+          external_account_id: "792-544-1166",
+          login_customer_id: null,
+          display_name: "Saved Disabled Google",
+          currency: "USD",
+          timezone: "America/Los_Angeles",
+          status: "inactive",
+          daily_guardrail_minor: 150000,
+          scopes_text: "adwords",
+        },
+      },
+    ];
+
+    const metaReply = parseConnectedAssetsReply(
+      {
+        toolkit: "metaads",
+        connected: true,
+        connections: [
+          {
+            connection_id: "c1",
+            account: "owner@example.test",
+            kind: "meta_ad_account",
+            selected: "act_111",
+            assets: [
+              { value: "act_111", label: "Saved Active Meta", permission: "active", selectable: true },
+              { value: "999888777", label: "Newly Discovered Meta — act_999888777", permission: "active", selectable: true, currency: "USD" },
+            ],
+          },
+        ],
+      },
+      "meta",
+    );
+    const googleExpired = parseConnectedAssetsReply(
+      { toolkit: "googleads", connected: false, needs_reconnect: true, connections: [] },
+      "google",
+    );
+
+    const merged = mergePlatformAccounts(saved, { meta: metaReply, google: googleExpired });
+    expect(merged).toHaveLength(3);
+    expect(merged[0]).toMatchObject({
+      externalAccountId: "act_111",
+      enabled: true,
+      guardrailMinor: 200000,
+      needsReconnect: false,
+    });
+    expect(merged[1]).toMatchObject({
+      externalAccountId: "act_999888777",
+      displayName: "Newly Discovered Meta",
+      enabled: false,
+      record: null,
+      currency: "USD",
+    });
+    expect(merged[2]).toMatchObject({
+      externalAccountId: "792-544-1166",
+      enabled: false,
+      needsReconnect: true,
+    });
+  });
+
+  test("connections.connect closed args allow toolkit + optional section and reject unknown fields", () => {
+    expect(CALL_FIELDS["connections.connect"]).toEqual(["toolkit", "section"]);
+    expect(cleanArgs("connections.connect", { toolkit: "metaads", section: "accounts" })).toEqual({
+      toolkit: "metaads",
+      section: "accounts",
+    });
+    expect(() => cleanArgs("connections.connect", { toolkit: "metaads", url: "https://evil" })).toThrow();
   });
 });

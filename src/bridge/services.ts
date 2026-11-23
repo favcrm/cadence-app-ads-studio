@@ -56,6 +56,10 @@ export interface CallArgs {
   "connections.assets": {
     toolkit: "metaads" | "googleads";
   };
+  "connections.connect": {
+    toolkit: "metaads" | "googleads";
+    section?: string;
+  };
   "screen.route.patch": {
     section?: Section;
     view?: "list" | "new";
@@ -73,6 +77,7 @@ export const CALL_FIELDS: Record<keyof CallArgs, readonly string[]> = {
   "records.update": ["table", "record_id", "expected_revision", "profile"],
   "records.batch": ["items"],
   "connections.assets": ["toolkit"],
+  "connections.connect": ["toolkit", "section"],
   "screen.route.patch": ["section", "view", "record_id", "segment_id", "params", "replace"],
 };
 
