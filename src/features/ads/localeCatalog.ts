@@ -173,4 +173,14 @@ export const zhHK: Record<string, string> = {
   "active budget": "啟用中預算",
   "No campaigns synced yet. Ask the assistant to sync Meta Ads or Google Ads.":
     "尚未同步任何廣告活動。請在對話中請助理同步 Meta Ads 或 Google Ads。",
+  "Host credentials and pinned Meta / Google Ads accounts live in Settings → Connections; daily guardrails store in app-storage/v1.":
+    "主機憑證與已釘選的 Meta / Google Ads 帳號統一於「設定 → 連線」管理；每日預算上限儲存於 app-storage/v1。",
+  "No ad accounts pinned in this workspace yet. Pin a Meta Ads ad account or Google Ads customer ID in Settings → Connections, then add it or sync in chat.":
+    "此工作區尚未釘選任何廣告帳號。請先到「設定 → 連線」釘選 Meta Ads 廣告帳號或 Google Ads 客戶 ID，再新增或透過對話同步。",
+  "Images & videos under global/ads-studio/assets/ · signed up to 15 MiB via /api/wiki/media/sign (or youtube_video_id:<id>)":
+    "圖片與影片存放於 global/ads-studio/assets/ · 15 MiB 內可經由 /api/wiki/media/sign 產生簽章網址（大於 15 MiB 請使用 youtube_video_id:<id>）",
+  "Upload images or MP4 cuts into Workspace Files (global/ads-studio/assets/) for temporary signed delivery (<= 15 MiB), or link a YouTube video ID (youtube_video_id:<id>) for > 15 MiB Google Ads videos.":
+    "請將圖片或 15 MiB 內 MP4 影片上傳至工作區檔案（global/ads-studio/assets/）以產生暫時簽章發佈網址，或為超過 15 MiB 的 Google 廣告影片填寫 youtube_video_id:<id>。",
+  "Leave empty for /api/wiki/media/sign, or enter a YouTube URL / youtube_video_id:<id>":
+    "留空代表使用 /api/wiki/media/sign 暫時簽章發佈，或貼上 YouTube 網址 / youtube_video_id:<id>",
 };

@@ -13,6 +13,7 @@ import {
   isCpaOutlier,
   isOverDailyGuardrail,
   isStarterDataset,
+  parseYouTubeVideoId,
   summarizeOverview,
   validateAccountInput,
   validateCreativePointer,
@@ -210,6 +211,66 @@ describe("ads domain guardrails and split reporting", () => {
       target_campaign: "Test",
     });
     expect(badSha.ok).toBe(false);
+  });
+
+  test("parseYouTubeVideoId and validateCreativePointer normalize valid YouTube refs and reject invalid ones", () => {
+    expect(parseYouTubeVideoId("dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(parseYouTubeVideoId("youtube_video_id:dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(parseYouTubeVideoId("https://youtu.be/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(parseYouTubeVideoId("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=5s")).toBe("dQw4w9WgXcQ");
+    expect(parseYouTubeVideoId("https://youtube.com/shorts/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(parseYouTubeVideoId("https://m.youtube.com/embed/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(parseYouTubeVideoId("http://youtu.be/dQw4w9WgXcQ")).toBeNull();
+    expect(parseYouTubeVideoId("https://evil.example/watch?v=dQw4w9WgXcQ")).toBeNull();
+    expect(parseYouTubeVideoId("https://user:pass@youtu.be/dQw4w9WgXcQ")).toBeNull();
+
+    const ytPointer = validateCreativePointer({
+      name: "cut.mp4",
+      media_kind: "video",
+      mime: "video/mp4",
+      dimensions: "1080×1920",
+      duration_seconds: 30,
+      size_bytes: HOSTED_WIKI_UPLOAD_MAX_BYTES + 1,
+      wiki_path: "global/ads-studio/assets/cut.mp4",
+      sha256: "b".repeat(64),
+      target_campaign: "Spring Reels",
+      platform_ref: "https://youtu.be/dQw4w9WgXcQ",
+    });
+    expect(ytPointer.ok).toBe(true);
+    if (ytPointer.ok) {
+      expect(ytPointer.value.platform_ref).toBe("youtube_video_id:dQw4w9WgXcQ");
+    }
+
+    const badYtPointer = validateCreativePointer({
+      name: "cut.mp4",
+      media_kind: "video",
+      mime: "video/mp4",
+      dimensions: "1080×1920",
+      duration_seconds: 30,
+      size_bytes: HOSTED_WIKI_UPLOAD_MAX_BYTES + 1,
+      wiki_path: "global/ads-studio/assets/cut.mp4",
+      sha256: "b".repeat(64),
+      target_campaign: "Spring Reels",
+      platform_ref: "youtube_video_id:too-short",
+    });
+    expect(badYtPointer.ok).toBe(false);
+
+    const metaHashPointer = validateCreativePointer({
+      name: "hero.jpg",
+      media_kind: "image",
+      mime: "image/jpeg",
+      dimensions: "1080×1080",
+      duration_seconds: null,
+      size_bytes: 512_000,
+      wiki_path: "global/ads-studio/assets/hero.jpg",
+      sha256: "c".repeat(64),
+      target_campaign: "Spring Feed",
+      platform_ref: "meta_image_hash: a94f10e88c21",
+    });
+    expect(metaHashPointer.ok).toBe(true);
+    if (metaHashPointer.ok) {
+      expect(metaHashPointer.value.platform_ref).toBe("meta_image_hash: a94f10e88c21");
+    }
   });
 
   test("computeChannelPacing and isStarterDataset separate live workspaces from starter seed", () => {

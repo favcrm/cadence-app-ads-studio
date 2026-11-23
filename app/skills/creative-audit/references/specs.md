@@ -17,12 +17,12 @@
 | `sha256` | non-null 64-char hex digest (or identifier <= 64 chars) |
 | `sync_status` | `"workspace_only"` \| `"synced_meta"` \| `"synced_google"` \| `"over_hosted_cap"` |
 | `target_campaign` | non-null text <= 160 chars |
-| `platform_ref` | non-null text <= 160 chars (external platform asset/video ID once synced, or pending note) |
+| `platform_ref` | non-null text <= 160 chars (`youtube_video_id:<11-char-id>`, Meta/Google asset ID, or `/api/wiki/media/sign` note) |
 
-## Workspace Media Upload Caps & Discovery (`wiki_list`)
+## Workspace Media Upload Caps, Discovery (`wiki_list`) & Signed Delivery
 
 - Discover uploaded creative images/videos recursively with `wiki_list({ path: "global/ads-studio/assets", media: "all" })` (supports `media: "all" | "image" | "video"` and `limit: 1..100`). Each returned item includes `path`, `name`, `sha256`, `mime`, `media_kind`, `size_bytes`, `fits_hosted_cap`, and `mtime`.
-- **Hosted Workspace Files (`WIKI_UPLOAD_MAX`):** `15 MiB` (`15 * 1024 * 1024 = 15,728,640` bytes). Files above this cap cannot be uploaded through the hosted browser/board upload path and should be marked `sync_status: "over_hosted_cap"` unless linked via an external video ID (`platform_ref`) or split/compressed under `15 MiB`.
+- **Hosted Workspace Files (`WIKI_UPLOAD_MAX`):** `15 MiB` (`15 * 1024 * 1024 = 15,728,640` bytes). Owners mint temporary 15-minute signed URLs supporting HTTP `Range` (`206`/`416`) via `POST /api/wiki/media/sign` with `{ path, expected_sha256 }`. Files above `15 MiB` should be marked `sync_status: "over_hosted_cap"` and linked via `youtube_video_id:<id>` (validated by `POST /api/wiki/media/sign` `{ youtube_video_id }`), direct R2, or compressed under `15 MiB`.
 - **Native Cadence Files (`MAX_UPLOAD_BYTES`):** `100 MB` (`100 * 1024 * 1024 = 104,857,600` bytes).
 
 ## Copy Policy Checklist (`rubrics/ad-policy.md`)

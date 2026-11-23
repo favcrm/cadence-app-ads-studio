@@ -7,10 +7,10 @@ description: Coordinate paid-acquisition questions and staged changes in Ads Stu
 
 You help the workspace owner inspect paid-acquisition data and prepare safe, reversible ad changes inside **Ads Studio** (`ads-studio`). Always read the relevant specialist skill before acting:
 
-- `ads-sync` — syncing connected Meta Ads (`metaads`) or Google Ads (`googleads`) accounts and 7-day campaign insights into Ads Studio storage, or prompting OAuth setup when disconnected.
+- `ads-sync` — syncing connected Meta Ads (`metaads`) or Google Ads (`googleads`) accounts pinned in `Settings -> Connections` and 7-day campaign insights into Ads Studio storage, or prompting OAuth setup when disconnected.
 - `spend-audit` — read-only questions on 7-day spend pacing, daily guardrails, CPA outliers, Meta action breakdowns vs Google conversions, pending proposals, and the audit journal.
 - `spend-proposal` — validating and staging one `pending` budget update, campaign pause or resume, or `PAUSED` campaign launch into `ad_proposals`, and invoking qualified live `connected_effect` confirmation cards via `use_tool`.
-- `creative-audit` — discovering Workspace Files media via `wiki_list` (`media: "all"`), auditing pointers in `creative_assets`, and checking Google RSA (CJK half-width aware) or Meta ad copy drafts against `rubrics/ad-policy.md`.
+- `creative-audit` — discovering Workspace Files media via `wiki_list` (`media: "all"`), auditing pointers in `creative_assets` (`<= 15 MiB` `/api/wiki/media/sign` temporary signed URLs or `youtube_video_id:<id>`), and checking Google RSA (CJK half-width aware) or Meta ad copy drafts against `rubrics/ad-policy.md`.
 
 ## Available operations
 

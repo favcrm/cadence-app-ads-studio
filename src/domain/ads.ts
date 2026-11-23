@@ -356,6 +356,48 @@ const VALID_CREATIVE_MIMES: ReadonlySet<string> = new Set([
   "video/mp4",
 ]);
 
+const YOUTUBE_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+const YOUTUBE_PREFIX = "youtube_video_id:";
+
+/** Parse a bare 11-char ID, `youtube_video_id:<id>`, or HTTPS YouTube URL into an 11-char ID. */
+export function parseYouTubeVideoId(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (YOUTUBE_ID_RE.test(trimmed)) return trimmed;
+  if (trimmed.toLowerCase().startsWith(YOUTUBE_PREFIX)) {
+    const id = trimmed.slice(YOUTUBE_PREFIX.length).trim();
+    return YOUTUBE_ID_RE.test(id) ? id : null;
+  }
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.username !== "" || url.password !== "" || url.port !== "") {
+    return null;
+  }
+  const host = url.hostname.toLowerCase();
+  const segments = url.pathname.split("/").filter(Boolean);
+  if (host === "youtu.be") {
+    return segments.length === 1 && YOUTUBE_ID_RE.test(segments[0]!) ? segments[0]! : null;
+  }
+  if (host === "youtube.com" || host === "www.youtube.com" || host === "m.youtube.com") {
+    if (segments.length === 1 && segments[0] === "watch") {
+      const v = url.searchParams.get("v");
+      return v && YOUTUBE_ID_RE.test(v) ? v : null;
+    }
+    if (
+      segments.length === 2 &&
+      (segments[0] === "shorts" || segments[0] === "embed") &&
+      YOUTUBE_ID_RE.test(segments[1]!)
+    ) {
+      return segments[1]!;
+    }
+  }
+  return null;
+}
+
 export function validateCreativePointer(input: {
   name: string;
   media_kind: MediaKind;
@@ -407,11 +449,25 @@ export function validateCreativePointer(input: {
   }
 
   const cap = assetCapStatus(input.size_bytes);
-  const platformRef =
-    input.platform_ref?.trim() ||
-    (cap === "within_hosted"
-      ? "Workspace Files pointer (within 15 MiB hosted cap)"
-      : "Over 15 MiB hosted cap · use YouTube / R2 direct");
+  const rawRef = input.platform_ref?.trim() ?? "";
+  let platformRef: string;
+  if (rawRef) {
+    const isExplicitYouTube =
+      /^youtube_video_id:/i.test(rawRef) || /youtu\.be|youtube\.com/i.test(rawRef);
+    const parsedYt = parseYouTubeVideoId(rawRef);
+    if (parsedYt) {
+      platformRef = `${YOUTUBE_PREFIX}${parsedYt}`;
+    } else if (isExplicitYouTube) {
+      return { ok: false, error: "Invalid YouTube video ID or URL." };
+    } else {
+      platformRef = rawRef;
+    }
+  } else {
+    platformRef =
+      cap === "within_hosted"
+        ? "Workspace Files pointer · /api/wiki/media/sign (<= 15 MiB)"
+        : "Over 15 MiB hosted cap · set youtube_video_id:<id> or R2";
+  }
 
   return {
     ok: true,

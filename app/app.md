@@ -1,7 +1,7 @@
 ---
 app: ads-studio
 title: Ads Studio
-version: '0.3.0'
+version: '0.4.0'
 summary: Cross-channel Meta Ads and Google Ads console for spend guardrails, owner-approved changes, and Workspace media pointers.
 needs:
   connections: []
@@ -14,7 +14,7 @@ listing:
   icon: assets/ads-studio.svg
   publisher:
     name: Cadence
-  about: Ads Studio brings Meta Ads and Google Ads campaigns into one Cadence workspace. Pin real Meta Ads and Google Ads accounts with per-account currency and daily spend guardrails, sync live 7-day spend and split conversions via Composio connectors, spot CPA outliers, review staged proposals before they apply, check CJK half-width Google RSA and Meta ad copy rules, and register Workspace Files media pointers discovered with wiki_list.
+  about: Ads Studio brings Meta Ads and Google Ads campaigns into one Cadence workspace. Pin real Meta Ads ad accounts and Google Ads customer IDs in Settings -> Connections, track daily spend guardrails, sync live 7-day spend and split conversions via Composio connectors, spot CPA outliers, review staged proposals before they apply, check CJK half-width Google RSA and Meta ad copy rules, and deliver creatives via signed <= 15 MiB Workspace Files URLs (/api/wiki/media/sign) or youtube_video_id refs.
   can:
     - Track Meta Ads and Google Ads campaigns with separate conversion reporting
     - Enforce daily spend guardrails and highlight high-CPA outliers
@@ -34,6 +34,12 @@ listing:
       tagline: 統一檢視 Meta 與 Google 廣告支出並以負責人審批控管變更
       summary: 在同一工作區追蹤 Meta 與 Google 廣告活動、設定每日支出護欄、審批預算與狀態調整，並管理工作區素材指標。
   changes:
+    - version: '0.4.0'
+      notes:
+        - Document host Settings -> Connections Meta/Google Ads account pinning and qualified read-only campaign sync
+        - Normalize YouTube video IDs and URLs to youtube_video_id:<id> alongside <= 15 MiB /api/wiki/media/sign signed delivery
+        - Update screen copy, zh-HK translations, and bundled skills for hosted media signing and pinned account enforcement
+      keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
     - version: '0.3.0'
       notes:
         - Add real Meta and Google ad-account onboarding with multi-currency formatting and pointer validation
@@ -68,7 +74,7 @@ Five owner-only tables live in `app-storage.json` (`storage/001-initial.json`):
 - `audit_events` (`append_only` journal)
 
 All monetary figures use integer minor units (`*_minor`) paired with currency.
-Live Composio connector reads/effects (`AOS-686`) activate after platform qualification.
+Account selection (`Settings -> Connections` asset pinning) and qualified media signing (`/api/wiki/media/sign` for `<= 15 MiB` `Range` delivery or `youtube_video_id:<id>` for `> 15 MiB` Google Ads videos) are host-enforced.
 
 ## Assistant access
 
