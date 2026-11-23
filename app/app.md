@@ -14,7 +14,7 @@ listing:
   icon: assets/ads-studio.svg
   publisher:
     name: Cadence
-  about: Ads Studio brings Meta Ads and Google Ads campaigns into one Cadence workspace. Pin real Meta Ads ad accounts and Google Ads customer IDs in Settings -> Connections, track daily spend guardrails, sync live 7-day spend and split conversions via Composio connectors, spot CPA outliers, review staged proposals before they apply, check CJK half-width Google RSA and Meta ad copy rules, and deliver creatives via signed <= 15 MiB Workspace Files URLs (/api/wiki/media/sign) or youtube_video_id refs.
+  about: Ads Studio brings Meta Ads and Google Ads campaigns into one Cadence workspace. Pin real Meta Ads ad accounts and Google Ads customer IDs in Settings Connections, track daily spend guardrails, sync live 7-day spend and split conversions via Composio connectors, spot CPA outliers, review staged proposals before they apply, check CJK half-width Google RSA and Meta ad copy rules, and deliver creatives via signed Workspace Files URLs or YouTube video IDs.
   can:
     - Track Meta Ads and Google Ads campaigns with separate conversion reporting
     - Enforce daily spend guardrails and highlight high-CPA outliers
@@ -36,9 +36,9 @@ listing:
   changes:
     - version: '0.4.0'
       notes:
-        - Document host Settings -> Connections Meta/Google Ads account pinning and qualified read-only campaign sync
-        - Normalize YouTube video IDs and URLs to youtube_video_id:<id> alongside <= 15 MiB /api/wiki/media/sign signed delivery
-        - Update screen copy, zh-HK translations, and bundled skills for hosted media signing and pinned account enforcement
+        - Support host Settings Connections ad-account pinning and read-only campaign sync
+        - Normalize YouTube video IDs and URLs alongside temporary signed Workspace media pointers
+        - Update screen copy, zh-HK locales, and bundled skills for hosted creative delivery
       keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
     - version: '0.3.0'
       notes:
