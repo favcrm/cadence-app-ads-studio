@@ -37,8 +37,8 @@ listing:
   changes:
     - version: '0.6.0'
       notes:
-        - Simplified Accounts tab with platform-grouped Enabled/Disabled toggles, inline daily limit editor, and direct + Add platform connection drawer
-        - Launch owner-only connections.connect redirect directly from Ads Studio without leaving to host Settings
+        - Simplify Accounts with platform-grouped enabled or disabled toggles and inline daily spend limit editing
+        - Connect Meta Ads and Google Ads directly from the Accounts drawer without leaving to workspace Settings
         - Prompt inline Reconnect when an existing platform connection expires
       keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
     - version: '0.5.0'
