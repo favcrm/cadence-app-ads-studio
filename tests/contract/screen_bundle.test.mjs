@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { views } from "../../scripts/ads_views.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const screenDir = resolve(root, "app/screens/ads-studio");
@@ -25,6 +26,16 @@ describe("ads-studio built screen bundle contract", () => {
       "records.update",
       "records.batch",
       "connections.assets",
+    ]);
+    expect(decl.views).toEqual(views);
+    expect(decl.views.map((v) => v.id)).toEqual([
+      "overview",
+      "campaigns",
+      "campaign_audit",
+      "campaign",
+      "proposals",
+      "creatives",
+      "accounts",
     ]);
 
     let total = 0;

@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { views } from "./ads_views.mjs";
 import { root, hash, files, inputs, sourceDigest, operationInventory } from "./screen_inputs.mjs";
 
 const env = inputs(process.argv.slice(2));
@@ -244,6 +245,7 @@ const decl = {
   tools: {},
   operations,
   navigation,
+  views,
 };
 
 const declaration = JSON.stringify(decl, null, 2) + "\n";
