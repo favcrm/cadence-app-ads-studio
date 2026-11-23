@@ -183,4 +183,25 @@ export const zhHK: Record<string, string> = {
     "請將圖片或 15 MiB 內 MP4 影片上傳至工作區檔案（global/ads-studio/assets/）以產生暫時簽章發佈網址，或為超過 15 MiB 的 Google 廣告影片填寫 youtube_video_id:<id>。",
   "Leave empty for /api/wiki/media/sign, or enter a YouTube URL / youtube_video_id:<id>":
     "留空代表使用 /api/wiki/media/sign 暫時簽章發佈，或貼上 YouTube 網址 / youtube_video_id:<id>",
+  "Could not read connected ad accounts from host Connections.":
+    "無法從主機「設定 → 連線」讀取已授權的廣告帳號。",
+  "This account is already tracked in Ads Studio.":
+    "此廣告帳號已存在於 Ads Studio 中。",
+  "Pick from Composio OAuth": "從 Composio OAuth 選擇帳號",
+  "Enter manually instead": "改為手動輸入",
+  "Loading Composio OAuth connections…": "正在讀取 Composio OAuth 連線帳號…",
+  "Could not reach Connections": "無法連線至主機連線服務",
+  "Connect in Settings → Connections": "請先至「設定 → 連線」完成授權",
+  "Meta Ads is not connected via Composio OAuth yet. Open Settings → Connections in the sidebar to authorize and pin an account, then click Refresh.":
+    "尚未透過 Composio OAuth 連結 Meta Ads。請先從左側選單前往「設定 → 連線」完成授權並釘選帳號，再按「重新整理」。",
+  "Google Ads is not connected via Composio OAuth yet. Open Settings → Connections in the sidebar to authorize and pin an account, then click Refresh.":
+    "尚未透過 Composio OAuth 連結 Google Ads。請先從左側選單前往「設定 → 連線」完成授權並釘選帳號，再按「重新整理」。",
+  "No authorized ad accounts returned": "未取得可用的授權廣告帳號",
+  "Connected accounts returned an error:": "已連結帳號回傳錯誤：",
+  "The connected OAuth profile did not return any selectable ad accounts. Check permissions in Settings → Connections, then click Refresh, or enter account details manually.":
+    "已授權的 OAuth 帳號未回傳任何可選取的廣告帳號。請檢查「設定 → 連線」權限後按「重新整理」，或改為手動輸入。",
+  "Connected via Composio OAuth": "已透過 Composio OAuth 授權",
+  "Pinned": "已釘選",
+  "Composio Ad Account": "Composio 廣告帳號",
+  "Already added": "已新增",
 };

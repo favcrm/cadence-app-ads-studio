@@ -16,8 +16,8 @@
     {
       "name": "client.js",
       "media_type": "text/javascript",
-      "size": 160046,
-      "sha256": "sha256:8c85b3dc35e6536bc4e2073acec3d2fd9139886dbd8c754afc191db51a44b38b"
+      "size": 169871,
+      "sha256": "sha256:54838b9dc9dc7e70f15fb9f91bba2b7303d275281a521dd802e9870a92b4bd11"
     },
     {
       "name": "ads-studio.css",
@@ -27,7 +27,7 @@
     }
   ],
   "provenance": {
-    "source_digest": "sha256:00e3377ca1f3d988a114f85eb8c567c7dbbb70edf235719ac7f554c2cd4e23ca",
+    "source_digest": "sha256:d3177661fe9270ae41eab56ce893b338eb5d87d4252d477fe910110f5d4eb146",
     "sdk_digest": "sha256:fd65c974511e63b3996e9fa7e438fb4e39df5f508d11636116ef150fcc123e35",
     "toolchain_digest": "sha256:e21cfc8222db408abe6ba5a482520639d9cf4b96481c19aff4b4246af8a65e42"
   },
@@ -41,7 +41,8 @@
     "records.show",
     "records.create",
     "records.update",
-    "records.batch"
+    "records.batch",
+    "connections.assets"
   ],
   "navigation": {
     "section_query": "ads",

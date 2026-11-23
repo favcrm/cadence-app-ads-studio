@@ -7,10 +7,190 @@ import {
   type AdProposalProfile,
   type AuditEventProfile,
   type CreativeAssetProfile,
+  type Platform,
   type ProposalActionType,
   type StoredRecord,
 } from "../../domain/ads";
 import { fmtMoney } from "../../domain/money";
+
+export interface ConnectedAssetOption {
+  value: string;
+  label: string;
+  permission: string;
+  selectable: boolean;
+  currency?: string;
+  timezone?: string;
+}
+
+export interface ConnectedAccountSource {
+  connection_id: string;
+  account: string;
+  kind: string | null;
+  selected: string | null;
+  assets: ConnectedAssetOption[];
+  error?: { code: string; message: string };
+}
+
+export interface ConnectedAssetsReply {
+  toolkit: "metaads" | "googleads";
+  connected: boolean;
+  connections: ConnectedAccountSource[];
+}
+
+export interface SelectableConnectedAsset {
+  connectionId: string;
+  connectionAccount: string;
+  asset: ConnectedAssetOption;
+  normalizedExternalId: string;
+  derivedDisplayName: string;
+  isPinned: boolean;
+  alreadyAdded: boolean;
+}
+
+export function normalizeGoogleCustomerId(raw: string): string {
+  const cleaned = raw.trim().replace(/^customers\//i, "");
+  const digitsOnly = cleaned.replace(/-/g, "");
+  if (/^\d{10}$/.test(digitsOnly)) {
+    return `${digitsOnly.slice(0, 3)}-${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6)}`;
+  }
+  return cleaned;
+}
+
+export function normalizeExternalAccountId(platform: Platform, raw: string): string {
+  const trimmed = raw.trim();
+  if (platform === "meta") {
+    return /^\d{4,24}$/.test(trimmed) ? `act_${trimmed}` : trimmed;
+  }
+  return normalizeGoogleCustomerId(trimmed);
+}
+
+export function deriveDisplayNameFromAsset(
+  asset: Pick<ConnectedAssetOption, "label" | "value">,
+  platform: Platform,
+): string {
+  const normalizedId = normalizeExternalAccountId(platform, asset.value);
+  const rawId = asset.value.trim().replace(/^customers\//i, "");
+  const plainDigits = rawId.replace(/-/g, "");
+  let label = asset.label.trim();
+  const candidates = new Set([rawId, normalizedId, plainDigits].filter((v) => v.length > 0));
+  for (const id of candidates) {
+    const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    label = label
+      .replace(new RegExp(`\\s*[—–-]\\s*${escaped}\\s*$`), "")
+      .replace(new RegExp(`\\s*\\(${escaped}\\)\\s*$`), "")
+      .trim();
+  }
+  const fallback = label.length > 0 ? label : normalizedId || asset.label.trim();
+  return fallback.slice(0, 120);
+}
+
+export function parseConnectedAssetsReply(
+  raw: unknown,
+  platform: Platform,
+): ConnectedAssetsReply {
+  const expectedToolkit = platform === "meta" ? "metaads" : "googleads";
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("Connections response is invalid.");
+  }
+  const body = raw as Record<string, unknown>;
+  if (body.toolkit !== expectedToolkit || typeof body.connected !== "boolean" || !Array.isArray(body.connections)) {
+    throw new Error("Connections response shape does not match the requested platform.");
+  }
+  const connections: ConnectedAccountSource[] = body.connections
+    .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === "object" && !Array.isArray(entry))
+    .map((entry) => {
+      const assetsRaw = Array.isArray(entry.assets) ? entry.assets : [];
+      const assets: ConnectedAssetOption[] = assetsRaw
+        .filter((a): a is Record<string, unknown> => !!a && typeof a === "object" && !Array.isArray(a))
+        .filter((a) => typeof a.value === "string" && typeof a.label === "string" && typeof a.selectable === "boolean")
+        .map((a) => ({
+          value: a.value as string,
+          label: a.label as string,
+          permission: typeof a.permission === "string" ? a.permission : "",
+          selectable: a.selectable as boolean,
+          ...(typeof a.currency === "string" ? { currency: a.currency } : {}),
+          ...(typeof a.timezone === "string" ? { timezone: a.timezone } : {}),
+        }));
+      const errObj =
+        entry.error && typeof entry.error === "object" && !Array.isArray(entry.error)
+          ? (entry.error as Record<string, unknown>)
+          : null;
+      return {
+        connection_id: typeof entry.connection_id === "string" ? entry.connection_id : "",
+        account: typeof entry.account === "string" ? entry.account : "",
+        kind: typeof entry.kind === "string" ? entry.kind : null,
+        selected: typeof entry.selected === "string" ? entry.selected : null,
+        assets,
+        ...(errObj && typeof errObj.message === "string"
+          ? {
+              error: {
+                code: typeof errObj.code === "string" ? errObj.code : "capability_unavailable",
+                message: errObj.message,
+              },
+            }
+          : {}),
+      };
+    });
+  return {
+    toolkit: expectedToolkit,
+    connected: body.connected,
+    connections,
+  };
+}
+
+export function flattenSelectableConnectedAssets(
+  reply: ConnectedAssetsReply,
+  platform: Platform,
+  existingAccounts: readonly StoredRecord<AdAccountProfile>[],
+): SelectableConnectedAsset[] {
+  const existingIds = new Set(
+    existingAccounts
+      .filter((acc) => acc.profile.platform === platform)
+      .map((acc) => normalizeExternalAccountId(platform, acc.profile.external_account_id).toLowerCase()),
+  );
+  const out: SelectableConnectedAsset[] = [];
+  for (const conn of reply.connections) {
+    const pinnedNorm = conn.selected ? normalizeExternalAccountId(platform, conn.selected).toLowerCase() : null;
+    for (const asset of conn.assets) {
+      if (!asset.selectable) continue;
+      const normalizedExternalId = normalizeExternalAccountId(platform, asset.value);
+      const isPinned =
+        asset.value === conn.selected ||
+        (pinnedNorm !== null && normalizedExternalId.toLowerCase() === pinnedNorm);
+      out.push({
+        connectionId: conn.connection_id,
+        connectionAccount: conn.account,
+        asset,
+        normalizedExternalId,
+        derivedDisplayName: deriveDisplayNameFromAsset(asset, platform),
+        isPinned,
+        alreadyAdded: existingIds.has(normalizedExternalId.toLowerCase()),
+      });
+    }
+  }
+  return out;
+}
+
+export function pickPreferredConnectedAsset(
+  options: readonly SelectableConnectedAsset[],
+): SelectableConnectedAsset | null {
+  return (
+    options.find((opt) => opt.isPinned && !opt.alreadyAdded) ??
+    options.find((opt) => !opt.alreadyAdded) ??
+    options.find((opt) => opt.isPinned) ??
+    options[0] ??
+    null
+  );
+}
+
+export async function loadConnectedAdAssets(
+  scope: DisplayScope,
+  platform: Platform,
+): Promise<ConnectedAssetsReply> {
+  const toolkit = platform === "meta" ? "metaads" : "googleads";
+  const raw = await serviceCall(scope, "connections.assets", { toolkit }, true);
+  return parseConnectedAssetsReply(raw, platform);
+}
 
 export interface WorkspaceDataset {
   accounts: StoredRecord<AdAccountProfile>[];

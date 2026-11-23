@@ -24,6 +24,7 @@ describe("ads-studio built screen bundle contract", () => {
       "records.create",
       "records.update",
       "records.batch",
+      "connections.assets",
     ]);
 
     let total = 0;

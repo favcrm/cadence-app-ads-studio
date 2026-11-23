@@ -19,6 +19,7 @@ import { ProposalsTab } from "./ProposalsTab";
 import {
   createAdAccount,
   decideProposal,
+  loadConnectedAdAssets,
   loadWorkspaceData,
   registerAssetPointer,
   saveAccountGuardrail,
@@ -100,6 +101,14 @@ function Mounted() {
     if (snapshot) void refresh();
   }, [refresh, snapshot]);
 
+  const loadConnectedAssetsForPlatform = useCallback(
+    (platform: Platform) => {
+      if (!snapshot) return Promise.reject(new Error("Workspace scope is unavailable."));
+      return loadConnectedAdAssets(snapshot.scope, platform);
+    },
+    [snapshot?.scope.installId, snapshot?.scope.digest],
+  );
+
   if (!snapshot) {
     const lost = scopeError();
     if (lost !== null) return <ErrorNotice>{t(lost)}</ErrorNotice>;
@@ -118,6 +127,7 @@ function Mounted() {
     actions.includes("records.create") &&
     actions.includes("records.update") &&
     actions.includes("records.batch");
+  const canReadConnections = !canvas && actions.includes("connections.assets");
 
   const activeParams = Object.entries(route.params ?? {});
 
@@ -252,6 +262,8 @@ function Mounted() {
               accounts={data.accounts}
               auditEvents={data.auditEvents}
               canWrite={canWrite}
+              canReadConnections={canReadConnections}
+              onLoadConnectedAssets={loadConnectedAssetsForPlatform}
               onClose={() => setDrawer(null)}
               onStageProposal={async (input) => {
                 await stageProposal(scope, input);
