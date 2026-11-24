@@ -67,10 +67,6 @@ listing:
         - Add interactive Google Search RSA half-width CJK and Meta ad copy policy checkers in Creatives
         - Add bundled ads-sync skill and update specialist skills for media discovery and connected approvals
       keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
-    - version: '0.2.0'
-      notes:
-        - Add four bundled assistant skills for spend audits, staged proposals, and creative policy checks
-      keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
 ---
 
 # Ads Studio
