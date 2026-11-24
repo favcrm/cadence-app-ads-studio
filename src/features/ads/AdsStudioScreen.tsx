@@ -4,33 +4,27 @@ import { patchRoute } from "../../bridge/route";
 import { scopeError, useCanvasReadOnly, useScope } from "../../bridge/scope";
 import {
   validateAccountInput,
-  type AdProposalProfile,
   type CampaignStatus,
   type Platform,
-  type StoredRecord,
 } from "../../domain/ads";
 import { AccountsTab } from "./AccountsTab";
-import { ApprovalModal } from "./ApprovalModal";
 import { CampaignsTab } from "./CampaignsTab";
 import { CreativesTab } from "./CreativesTab";
 import { DetailDrawer, type ActiveDrawer } from "./DetailDrawer";
 import { AdsLocaleProvider, useLocale } from "./locale";
 import { OverviewTab } from "./OverviewTab";
-import { ProposalsTab } from "./ProposalsTab";
 import {
   buildAccountPickerModel,
   confirmAndImportAccounts,
   connectAdPlatform,
   connectProviderToPlatform,
   createAdAccount,
-  decideProposal,
   loadConnectedAdAssets,
   loadWorkspaceData,
   registerAssetPointer,
   saveAccountGuardrail,
   seedStarterWorkspace,
   setAdAccountEnabled,
-  stageProposal,
   syncSingleAccountCampaigns,
   type AccountPickSelection,
   type AccountSyncOutcome,
@@ -76,7 +70,6 @@ function Mounted() {
   const [search, setSearch] = useState("");
 
   const [drawer, setDrawer] = useState<ActiveDrawer | null>(null);
-  const [modalProposal, setModalProposal] = useState<StoredRecord<AdProposalProfile> | null>(null);
   const [connectionsByPlatform, setConnectionsByPlatform] = useState<
     Partial<Record<Platform, ConnectedAssetsReply>>
   >({});
@@ -284,11 +277,6 @@ function Mounted() {
           <Button size="sm" onClick={() => void refresh()}>
             {t("Refresh")}
           </Button>
-          {canWrite && (
-            <Button variant="primary" size="sm" onClick={() => setDrawer({ kind: "new_campaign" })}>
-              {t("+ Propose campaign")}
-            </Button>
-          )}
         </div>
       </div>
 
@@ -313,7 +301,6 @@ function Mounted() {
             <OverviewTab
               accounts={data.accounts}
               campaigns={data.campaigns}
-              proposals={data.proposals}
               auditEvents={data.auditEvents}
               connectionsByPlatform={connectionsByPlatform}
               canWrite={canWrite}
@@ -364,18 +351,6 @@ function Mounted() {
               onInspectCampaign={(id) => {
                 const found = data.campaigns.find((c) => c.id === id);
                 if (found) setDrawer({ kind: "campaign", record: found });
-              }}
-            />
-          )}
-
-          {route.section === "proposals" && (
-            <ProposalsTab
-              proposals={data.proposals}
-              accounts={data.accounts}
-              canWrite={canWrite}
-              onReviewProposal={(rec) => {
-                setDrawer(null);
-                setModalProposal(rec);
               }}
             />
           )}
@@ -566,17 +541,11 @@ function Mounted() {
               drawer={drawer}
               accounts={data.accounts}
               auditEvents={data.auditEvents}
-              canWrite={canWrite}
               canConnect={canConnect}
               onConnectPlatform={async (platform) => {
                 await connectAdPlatform(scope, platform, "accounts");
               }}
               onClose={() => setDrawer(null)}
-              onStageProposal={async (input) => {
-                await stageProposal(scope, input);
-                await refresh();
-                void patchRoute({ section: "proposals", view: "list", record_id: null });
-              }}
               onCreateAccount={async (account) => {
                 await createAdAccount(scope, account);
                 await refresh();
@@ -584,23 +553,6 @@ function Mounted() {
               }}
               onCreateAsset={async (asset) => {
                 await registerAssetPointer(scope, asset);
-                await refresh();
-              }}
-            />
-          )}
-
-          {modalProposal && canWrite && (
-            <ApprovalModal
-              proposal={modalProposal}
-              accounts={data.accounts}
-              onCancel={() => setModalProposal(null)}
-              onConfirm={async (decision) => {
-                const camp =
-                  data.campaigns.find(
-                    (c) => c.profile.campaign_key === modalProposal.profile.campaign_key,
-                  ) ?? null;
-                await decideProposal(scope, modalProposal, camp, decision);
-                setModalProposal(null);
                 await refresh();
               }}
             />

@@ -35,7 +35,6 @@ describe("ads-studio built screen bundle contract", () => {
       "campaigns",
       "campaign_audit",
       "campaign",
-      "proposals",
       "creatives",
       "accounts",
     ]);

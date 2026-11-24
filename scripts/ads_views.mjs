@@ -41,12 +41,6 @@ export const views = [
     },
   },
   {
-    id: "proposals",
-    label: { en: "Changes", "zh-TW": "變更提案" },
-    section: "proposals",
-    params: {},
-  },
-  {
     id: "creatives",
     label: { en: "Creatives", "zh-TW": "廣告素材" },
     section: "creatives",

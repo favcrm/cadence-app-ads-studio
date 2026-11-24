@@ -16,8 +16,8 @@
     {
       "name": "client.js",
       "media_type": "text/javascript",
-      "size": 205003,
-      "sha256": "sha256:0206c1c94e6dcdee0c183bef17e35c73ee654b48446ca6cfafb5cc30f5391004"
+      "size": 190574,
+      "sha256": "sha256:00186c560eb506b80c6398927f2189d782b445f91197583ce0d913c0a1dc8e32"
     },
     {
       "name": "ads-studio.css",
@@ -27,7 +27,7 @@
     }
   ],
   "provenance": {
-    "source_digest": "sha256:57b05aedb8b4f56edaf9e23ada613946fbec48da3085d8e02cb7afe80888b1df",
+    "source_digest": "sha256:88cab0eeff51f0dde9458bd22f0dc8d8c1809324d6b71f340a1045597892e31e",
     "sdk_digest": "sha256:fd65c974511e63b3996e9fa7e438fb4e39df5f508d11636116ef150fcc123e35",
     "toolchain_digest": "sha256:e21cfc8222db408abe6ba5a482520639d9cf4b96481c19aff4b4246af8a65e42"
   },
@@ -65,15 +65,6 @@
         "i18n": {
           "zh-TW": {
             "label": "廣告活動"
-          }
-        }
-      },
-      {
-        "id": "proposals",
-        "label": "Changes",
-        "i18n": {
-          "zh-TW": {
-            "label": "變更提案"
           }
         }
       },
@@ -212,15 +203,6 @@
           "type": "string"
         }
       }
-    },
-    {
-      "id": "proposals",
-      "label": {
-        "en": "Changes",
-        "zh-TW": "變更提案"
-      },
-      "section": "proposals",
-      "params": {}
     },
     {
       "id": "creatives",

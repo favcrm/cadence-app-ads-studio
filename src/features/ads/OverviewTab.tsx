@@ -8,7 +8,6 @@ import {
   summarizeOverview,
   type AdAccountProfile,
   type AdCampaignProfile,
-  type AdProposalProfile,
   type AuditEventProfile,
   type Platform,
   type StoredRecord,
@@ -21,7 +20,6 @@ import { StatusPill, statusTone } from "./StatusPill";
 export function OverviewTab({
   accounts,
   campaigns,
-  proposals,
   auditEvents,
   connectionsByPlatform,
   canWrite,
@@ -38,7 +36,6 @@ export function OverviewTab({
 }: {
   accounts: readonly StoredRecord<AdAccountProfile>[];
   campaigns: readonly StoredRecord<AdCampaignProfile>[];
-  proposals: readonly StoredRecord<AdProposalProfile>[];
   auditEvents: readonly StoredRecord<AuditEventProfile>[];
   connectionsByPlatform?: Partial<Record<Platform, ConnectedAssetsReply>>;
   canWrite: boolean;
@@ -50,7 +47,7 @@ export function OverviewTab({
   onSeedStarter: () => void;
   onAddAccount: () => void;
   onChooseConnectedAccounts?: () => void;
-  onGoSection: (section: "campaigns" | "proposals") => void;
+  onGoSection: (section: "campaigns") => void;
   onInspectCampaign: (id: string) => void;
 }) {
   const { locale, canvas, t } = useLocale();
@@ -152,7 +149,6 @@ export function OverviewTab({
       ? campaigns
       : campaigns.filter((c) => c.profile.platform === platformFilter);
   const summary = summarizeOverview(filtered.map((r) => r.profile));
-  const pendingCount = proposals.filter((p) => p.profile.status === "pending").length;
 
   const metaAccount = accounts.find((a) => a.profile.platform === "meta")?.profile;
   const googleAccount = accounts.find((a) => a.profile.platform === "google")?.profile;
@@ -207,27 +203,6 @@ export function OverviewTab({
           ]}
         />
       </div>
-
-      {canWrite && pendingCount > 0 && (
-        <div className="ads-banner" data-tone="warn" role="region" aria-label="Pending approvals">
-          <div className="ads-banner-body">
-            <strong>
-              {pendingCount}{" "}
-              {pendingCount === 1
-                ? t("staged spend change awaiting owner approval")
-                : t("staged spend changes awaiting owner approval")}
-            </strong>
-            <p>
-              {t(
-                "Ad spend mutations stage here first and apply only once an owner confirms the exact diff.",
-              )}
-            </p>
-          </div>
-          <Button variant="primary" size="sm" onClick={() => onGoSection("proposals")}>
-            {t("Review changes")}
-          </Button>
-        </div>
-      )}
 
       <div className="ads-kpi-grid">
         <article className="ads-card ads-kpi-card">

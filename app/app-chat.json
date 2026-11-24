@@ -6,8 +6,8 @@
       "id": "overview",
       "label": "Overview",
       "prompts": [
-        "Audit wasted spend in the last 7 days",
-        "Summarize Meta vs Google conversion split",
+        "Audit wasted spend and conversion ROAS in the last 7 days",
+        "Summarize Meta actions vs Google conversions separately",
         "Check daily spend pacing against guardrails"
       ]
     },
@@ -15,27 +15,19 @@
       "id": "campaigns",
       "label": "Campaigns",
       "prompts": [
-        "Find any limited campaigns or CPA outliers above HK$180",
-        "Propose pausing campaigns above HK$180 CPA",
-        "Stage a daily budget increase for top-performing prospecting"
+        "Find CPA outliers above HK$180 or wasted Google search terms",
+        "Pause a losing Meta ad set or campaign via owner approval",
+        "Adjust a daily budget inside the account guardrail"
       ],
       "record": {
         "label": "Campaign"
       }
     },
     {
-      "id": "proposals",
-      "label": "Changes",
-      "prompts": [
-        "Summarize all pending spend proposals awaiting owner approval",
-        "Check whether staged budgets stay inside account guardrails"
-      ]
-    },
-    {
       "id": "creatives",
       "label": "Creatives",
       "prompts": [
-        "Draft 3 zh-HK Meta creative variants",
+        "Audit live Meta creatives and draft 3 zh-HK variants",
         "Check ad headline and description length limits for Google RSA",
         "List creative assets in global/ads-studio/assets/ under 15 MiB"
       ]
