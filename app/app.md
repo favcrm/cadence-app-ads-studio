@@ -19,7 +19,7 @@ listing:
     - Connect Meta Ads and Google Ads platforms directly and toggle enabled or disabled accounts
     - Track Meta Ads and Google Ads campaigns with separate conversion reporting
     - Enforce daily spend limits and highlight high-CPA outliers
-    - Stage live campaign, ad set, and status changes directly into Cadence Home for single-step owner approval
+    - Stage live campaign and ad-set changes directly in Cadence Home for owner approval
     - Store image and video pointers linked to Workspace Files
   screenshots: []
   setup: []
@@ -36,9 +36,9 @@ listing:
   changes:
     - version: '0.8.0'
       notes:
-        - Remove the redundant Changes/Proposals shadow queue tab so all live ad spend and status changes go directly through Cadence Home approval cards
-        - Simplify top-level navigation to Overview, Campaigns, Creatives, and Accounts while keeping app-storage v1 tables upgrade-compatible
-        - Update bundled skills for enriched Meta insights (conversions & adset/ad breakdown), Meta adsets/ads/creatives/status, Google ad-groups & search terms, and UI/MCP/CLI exposure
+        - Remove shadow Proposals tab so live spend and status changes approve once in Cadence Home
+        - Simplify navigation to Overview, Campaigns, Creatives, and Accounts with compatible v1 storage
+        - Update bundled skills for Meta conversions, adsets, ads, Google search terms, and UI, MCP, CLI
       keeps: Existing ad accounts, campaigns, historical proposals rows, creative pointers, and audit events stay intact
     - version: '0.7.0'
       notes:
@@ -65,12 +65,6 @@ listing:
         - Support host Settings Connections ad-account pinning and read-only campaign sync
         - Normalize YouTube video IDs and URLs alongside temporary signed Workspace media pointers
         - Update screen copy, zh-HK locales, and bundled skills for hosted creative delivery
-      keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
-    - version: '0.3.0'
-      notes:
-        - Add real Meta and Google ad-account onboarding with multi-currency formatting and pointer validation
-        - Add interactive Google Search RSA half-width CJK and Meta ad copy policy checkers in Creatives
-        - Add bundled ads-sync skill and update specialist skills for media discovery and connected approvals
       keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
 ---
 
