@@ -18,7 +18,10 @@ import { AdsLocaleProvider, useLocale } from "./locale";
 import { OverviewTab } from "./OverviewTab";
 import { ProposalsTab } from "./ProposalsTab";
 import {
+  buildAccountPickerModel,
+  confirmAndImportAccounts,
   connectAdPlatform,
+  connectProviderToPlatform,
   createAdAccount,
   decideProposal,
   loadConnectedAdAssets,
@@ -28,6 +31,10 @@ import {
   seedStarterWorkspace,
   setAdAccountEnabled,
   stageProposal,
+  syncSingleAccountCampaigns,
+  type AccountPickSelection,
+  type AccountSyncOutcome,
+  type ConfirmImportResult,
   type ConnectedAssetsReply,
   type WorkspaceDataset,
 } from "./records";
@@ -75,7 +82,23 @@ function Mounted() {
   >({});
   const [loadingConnections, setLoadingConnections] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerFocus, setPickerFocus] = useState<Platform | null>(null);
+  const [pickerSelectedIds, setPickerSelectedIds] = useState<string[]>([]);
+  const [pickerOptedOut, setPickerOptedOut] = useState<Partial<Record<Platform, boolean>>>({});
+  const [importingStatus, setImportingStatus] = useState<{
+    active: boolean;
+    current: number;
+    total: number;
+    currentName: string;
+  } | null>(null);
+  const [importResult, setImportResult] = useState<ConfirmImportResult | null>(null);
+  const [connectNotice, setConnectNotice] = useState<string | null>(null);
+  const [syncingAccountKey, setSyncingAccountKey] = useState<string | null>(null);
   const openedRouteTarget = useRef<string | null>(null);
+  const autoInitializedProviders = useRef<Set<Platform>>(new Set());
+  const pendingConnectReturn = useRef<Platform | null>(null);
+  const connectionsInFlightRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     if (snapshot) return;
@@ -110,9 +133,40 @@ function Mounted() {
     }
   }, [snapshot?.scope.installId, snapshot?.scope.digest]);
 
+  const loadAllConnections = useCallback(async () => {
+    if (!snapshot || canvas || !snapshot.actions.includes("connections.assets")) return;
+    if (connectionsInFlightRef.current) return connectionsInFlightRef.current;
+
+    const run = (async () => {
+      setLoadingConnections(true);
+      setConnectionError(null);
+      const next: Partial<Record<Platform, ConnectedAssetsReply>> = {};
+      const errs: string[] = [];
+      for (const platform of ["meta", "google"] as const) {
+        try {
+          next[platform] = await loadConnectedAdAssets(snapshot.scope, platform);
+        } catch (err) {
+          errs.push(err instanceof Error ? err.message : platform === "meta" ? "Meta Ads" : "Google Ads");
+        }
+      }
+      if (Object.keys(next).length > 0) {
+        setConnectionsByPlatform((prev) => ({ ...prev, ...next }));
+      }
+      if (errs.length > 0) setConnectionError(errs.join(" · "));
+      setLoadingConnections(false);
+    })();
+
+    connectionsInFlightRef.current = run.finally(() => {
+      connectionsInFlightRef.current = null;
+    });
+    return connectionsInFlightRef.current;
+  }, [snapshot?.scope.installId, snapshot?.scope.digest, canvas, snapshot?.actions]);
+
+  const hasSnapshot = snapshot !== null;
   useEffect(() => {
-    if (snapshot) void refresh();
-  }, [refresh, snapshot]);
+    if (!hasSnapshot) return;
+    void refresh().then(() => void loadAllConnections());
+  }, [hasSnapshot, refresh, loadAllConnections]);
 
   const routeTargetId =
     snapshot?.route.params?.id?.trim() || snapshot?.route.record_id?.trim() || "";
@@ -140,28 +194,61 @@ function Mounted() {
     }
   }, [data, routeSection, routeTargetId]);
 
-  const loadAllConnections = useCallback(async () => {
-    if (!snapshot || canvas || !snapshot.actions.includes("connections.assets")) return;
-    setLoadingConnections(true);
-    setConnectionError(null);
-    const [metaRes, googleRes] = await Promise.allSettled([
-      loadConnectedAdAssets(snapshot.scope, "meta"),
-      loadConnectedAdAssets(snapshot.scope, "google"),
-    ]);
-    const next: Partial<Record<Platform, ConnectedAssetsReply>> = {};
-    const errs: string[] = [];
-    if (metaRes.status === "fulfilled") next.meta = metaRes.value;
-    else errs.push(metaRes.reason instanceof Error ? metaRes.reason.message : "Meta Ads");
-    if (googleRes.status === "fulfilled") next.google = googleRes.value;
-    else errs.push(googleRes.reason instanceof Error ? googleRes.reason.message : "Google Ads");
-    setConnectionsByPlatform(next);
-    if (errs.length > 0) setConnectionError(errs.join(" · "));
-    setLoadingConnections(false);
-  }, [snapshot?.scope.installId, snapshot?.scope.digest, canvas, snapshot?.actions]);
-
+  // Read `p.connect_provider` as a one-time OAuth return focus hint and clear it cleanly.
+  const connectProviderParam = snapshot?.route.params?.connect_provider;
   useEffect(() => {
-    if (snapshot) void loadAllConnections();
-  }, [loadAllConnections, snapshot]);
+    if (!snapshot || !connectProviderParam) return;
+    const focus = connectProviderToPlatform(connectProviderParam);
+    const nextParams = { ...(snapshot.route.params ?? {}) };
+    delete nextParams.connect_provider;
+    if (focus) {
+      pendingConnectReturn.current = focus;
+      autoInitializedProviders.current.delete(focus);
+      setPickerFocus(focus);
+      setPickerOpen(true);
+      setPickerOptedOut((prev) => ({ ...prev, [focus]: false }));
+      setConnectNotice(null);
+    }
+    void patchRoute({
+      section: focus ? "accounts" : snapshot.route.section,
+      view: "list",
+      record_id: null,
+      params: nextParams,
+      replace: true,
+    }).finally(() => {
+      if (focus) void loadAllConnections();
+    });
+  }, [connectProviderParam, snapshot?.scope.installId, loadAllConnections]);
+
+  // Pre-select sole selectable account per newly loaded platform (never auto-saving)
+  // and detect cancelled/incomplete OAuth returns without clearing saved or draft choices.
+  useEffect(() => {
+    const model = buildAccountPickerModel({
+      connectionsByPlatform,
+      existingAccounts: data?.accounts ?? [],
+      focusPlatform: null,
+    });
+    const toPreselect: string[] = [];
+    for (const section of model.providers) {
+      if (section.state === "ready" && !autoInitializedProviders.current.has(section.platform)) {
+        autoInitializedProviders.current.add(section.platform);
+        if (section.selectableAssets.length === 1 && !section.selectableAssets[0]!.alreadyAdded) {
+          toPreselect.push(section.selectableAssets[0]!.pickerId);
+        }
+      }
+    }
+    if (toPreselect.length > 0) {
+      setPickerSelectedIds((prev) => Array.from(new Set([...prev, ...toPreselect])));
+    }
+    const returned = pendingConnectReturn.current;
+    if (returned && !loadingConnections) {
+      const reply = connectionsByPlatform[returned];
+      if (reply && !reply.connected) {
+        setConnectNotice("Connection was not completed. Your saved accounts and choices were kept.");
+      }
+      pendingConnectReturn.current = null;
+    }
+  }, [connectionsByPlatform, data?.accounts, loadingConnections]);
 
   if (!snapshot) {
     const lost = scopeError();
@@ -228,6 +315,7 @@ function Mounted() {
               campaigns={data.campaigns}
               proposals={data.proposals}
               auditEvents={data.auditEvents}
+              connectionsByPlatform={connectionsByPlatform}
               canWrite={canWrite}
               seeding={busySeed}
               range={range}
@@ -244,6 +332,12 @@ function Mounted() {
                 }
               }}
               onAddAccount={() => setDrawer({ kind: "new_account" })}
+              onChooseConnectedAccounts={() => {
+                setPickerFocus(null);
+                setPickerOpen(true);
+                setConnectNotice(null);
+                void patchRoute({ section: "accounts", view: "list", record_id: null });
+              }}
               onGoSection={(section) => void patchRoute({ section, view: "list", record_id: null })}
               onInspectCampaign={(id) => {
                 const found = data.campaigns.find((c) => c.id === id);
@@ -304,14 +398,143 @@ function Mounted() {
               connectionsByPlatform={connectionsByPlatform}
               loadingConnections={loadingConnections}
               connectionError={connectionError}
+              pickerOpen={pickerOpen}
+              pickerFocus={pickerFocus}
+              pickerSelectedIds={new Set(pickerSelectedIds)}
+              pickerOptedOut={pickerOptedOut}
+              importingStatus={importingStatus}
+              importResult={importResult}
+              connectNotice={connectNotice}
+              syncingAccountKey={syncingAccountKey}
               canWrite={canWrite}
               canConnect={canConnect}
               onRefresh={async () => {
-                await Promise.all([refresh(), loadAllConnections()]);
+                await refresh();
+                await loadAllConnections();
               }}
+              onOpenPicker={(focus) => {
+                setPickerFocus(focus);
+                setPickerOpen(true);
+                setConnectNotice(null);
+              }}
+              onClosePicker={() => setPickerOpen(false)}
+              onTogglePickerAsset={(pickerId) => {
+                setPickerSelectedIds((prev) =>
+                  prev.includes(pickerId)
+                    ? prev.filter((id) => id !== pickerId)
+                    : [...prev, pickerId],
+                );
+              }}
+              onTogglePickerOptOut={(platform, nextOptOut) => {
+                setPickerOptedOut((prev) => ({ ...prev, [platform]: nextOptOut }));
+              }}
+              onConfirmPicker={async (picks: AccountPickSelection[]) => {
+                setImportingStatus({
+                  active: true,
+                  current: 1,
+                  total: picks.length,
+                  currentName: picks[0]?.displayName ?? "",
+                });
+                try {
+                  const res = await confirmAndImportAccounts({
+                    scope,
+                    picks,
+                    existingAccounts: data.accounts,
+                    existingCampaigns: data.campaigns,
+                    onProgress: ({ index, total, pick }) => {
+                      setImportingStatus({
+                        active: true,
+                        current: index,
+                        total,
+                        currentName: pick.displayName,
+                      });
+                    },
+                  });
+                  setImportResult(res);
+                  const succeededIds = new Set(
+                    picks
+                      .filter((_, i) => res.outcomes[i]?.status !== "failed")
+                      .map((p) => p.pickerId),
+                  );
+                  setPickerSelectedIds((prev) => prev.filter((id) => !succeededIds.has(id)));
+                  if (res.outcomes.every((o) => o.status !== "failed")) {
+                    setPickerOpen(false);
+                  }
+                  await refresh();
+                  await loadAllConnections();
+                } finally {
+                  setImportingStatus(null);
+                }
+              }}
+              onRetryAccountSync={async (outcome: AccountSyncOutcome) => {
+                const account = data.accounts.find(
+                  (a) => a.profile.account_key === outcome.accountKey,
+                );
+                if (!account) return;
+                setSyncingAccountKey(outcome.accountKey);
+                try {
+                  const updated = await syncSingleAccountCampaigns({
+                    scope,
+                    account,
+                    connectionId: outcome.connectionId,
+                    existingCampaigns: [...data.campaigns],
+                  });
+                  setImportResult((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          importedCampaignCount: prev.outcomes.reduce(
+                            (sum, o) =>
+                              sum + (o.accountKey === outcome.accountKey ? updated.importedCount : o.importedCount),
+                            0,
+                          ),
+                          outcomes: prev.outcomes.map((o) =>
+                            o.accountKey === outcome.accountKey ? updated : o,
+                          ),
+                        }
+                      : prev,
+                  );
+                  await refresh();
+                } finally {
+                  setSyncingAccountKey(null);
+                }
+              }}
+              onSyncAccount={async (item) => {
+                if (!item.record || !item.connectedAsset) return;
+                setSyncingAccountKey(item.key);
+                try {
+                  const updated = await syncSingleAccountCampaigns({
+                    scope,
+                    account: item.record,
+                    connectionId: item.connectedAsset.connectionId,
+                    existingCampaigns: [...data.campaigns],
+                  });
+                  setImportResult({
+                    importedCampaignCount: updated.importedCount,
+                    adsStatus: "not_imported",
+                    savedAccountKeys: [item.key],
+                    outcomes: [updated],
+                  });
+                  await refresh();
+                } finally {
+                  setSyncingAccountKey(null);
+                }
+              }}
+              onDismissImportResult={() => setImportResult(null)}
+              onDismissConnectNotice={() => setConnectNotice(null)}
+              onViewCampaigns={() =>
+                void patchRoute({ section: "campaigns", view: "list", record_id: null })
+              }
               onAddAccount={() => setDrawer({ kind: "new_account" })}
               onConnectPlatform={async (platform) => {
-                await connectAdPlatform(scope, platform, "accounts");
+                try {
+                  const { started } = await connectAdPlatform(scope, platform, "accounts");
+                  if (!started) {
+                    setConnectNotice("Connection was not completed. Your saved accounts and choices were kept.");
+                  }
+                } catch {
+                  setConnectNotice("Connection was not completed. Your saved accounts and choices were kept.");
+                }
               }}
               onToggleAccount={async (item, nextEnabled) => {
                 if (item.record) {

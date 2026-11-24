@@ -2,11 +2,14 @@ import type { DisplayScope } from "../../bridge/scope";
 import { clientFor, notifyWritten, serviceCall } from "../../bridge/services";
 import {
   STARTER_SEED,
+  validateAccountInput,
   type AdAccountProfile,
   type AdCampaignProfile,
   type AdProposalProfile,
   type AuditEventProfile,
+  type CampaignStatus,
   type CreativeAssetProfile,
+  type MetaActionCount,
   type Platform,
   type ProposalActionType,
   type StoredRecord,
@@ -20,6 +23,7 @@ export interface ConnectedAssetOption {
   selectable: boolean;
   currency?: string;
   timezone?: string;
+  login_customer_id?: string;
 }
 
 export interface ConnectedAccountSource {
@@ -128,6 +132,9 @@ export function parseConnectedAssetsReply(
           selectable: a.selectable as boolean,
           ...(typeof a.currency === "string" ? { currency: a.currency } : {}),
           ...(typeof a.timezone === "string" ? { timezone: a.timezone } : {}),
+          ...(typeof a.login_customer_id === "string"
+            ? { login_customer_id: a.login_customer_id }
+            : {}),
         }));
       const errObj =
         entry.error && typeof entry.error === "object" && !Array.isArray(entry.error)
@@ -268,11 +275,13 @@ export function mergePlatformAccounts(
       seenIds.add(norm);
       out.push({
         id: `conn:${platform}:${opt.connectionId}:${opt.asset.value}`,
-        key: `${platform}_${norm.replace(/[^a-z0-9]+/g, "_")}`,
+        key: normalizeImportedAccountKey(platform, opt.normalizedExternalId),
         platform,
         displayName: opt.derivedDisplayName,
         externalAccountId: opt.normalizedExternalId,
-        loginCustomerId: null,
+        loginCustomerId: opt.asset.login_customer_id
+          ? normalizeGoogleCustomerId(opt.asset.login_customer_id)
+          : null,
         currency: opt.asset.currency?.trim().toUpperCase() || "HKD",
         timezone: opt.asset.timezone?.trim() || "Asia/Hong_Kong",
         status: "inactive",
@@ -597,4 +606,641 @@ export async function registerAssetPointer(
     ],
   });
   notifyWritten();
+}
+
+export type BridgeCaller = <Verb extends Parameters<typeof serviceCall>[1]>(
+  verb: Verb,
+  args: Parameters<typeof serviceCall<Verb>>[2],
+  quiet?: boolean,
+) => Promise<unknown>;
+
+export interface ImportedCampaignRow {
+  external_campaign_id: string;
+  name: string;
+  objective: string;
+  status: CampaignStatus;
+  daily_budget_minor: number;
+  spend_7d_minor: number;
+  impressions_7d: number;
+  clicks_7d: number;
+  google_conversions: number | null;
+  meta_actions_json: MetaActionCount[] | null;
+  cpa_minor: number | null;
+}
+
+export interface ImportedCampaignsReply {
+  toolkit: "metaads" | "googleads";
+  platform: Platform;
+  connection_id: string;
+  account_id: string;
+  login_customer_id: string | null;
+  currency: string;
+  status: "ok" | "empty" | "partial";
+  truncated: boolean;
+  synced_at: string;
+  levels: { campaigns: number; ads: null };
+  ads_status: "not_imported";
+  warnings: Array<{ code: string; message: string }>;
+  campaigns: ImportedCampaignRow[];
+}
+
+export interface PickerSelectableAsset {
+  pickerId: string;
+  connectionId: string;
+  connectionAccount: string;
+  platform: Platform;
+  externalAccountId: string;
+  loginCustomerId: string | null;
+  displayName: string;
+  currency: string;
+  timezone: string;
+  isPinned: boolean;
+  alreadyAdded: boolean;
+}
+
+export interface PickerUnavailableAsset {
+  pickerId: string;
+  platform: Platform;
+  displayName: string;
+  externalAccountId: string;
+  permission: string;
+}
+
+export interface ProviderPickerSection {
+  platform: Platform;
+  connected: boolean;
+  needsReconnect: boolean;
+  state: "not_connected" | "expired" | "empty" | "unavailable" | "ready";
+  selectableAssets: PickerSelectableAsset[];
+  unavailableAssets: PickerUnavailableAsset[];
+  connectionError: string | null;
+}
+
+export interface AccountPickerModel {
+  visiblePlatforms: Platform[];
+  providers: ProviderPickerSection[];
+  defaultSelectedIds: string[];
+  alreadyTrackedCount: number;
+}
+
+export interface AccountPickSelection {
+  pickerId: string;
+  connectionId: string;
+  platform: Platform;
+  externalAccountId: string;
+  loginCustomerId: string | null;
+  displayName: string;
+  currency: string;
+  timezone: string;
+}
+
+export interface AccountSyncOutcome {
+  accountKey: string;
+  displayName: string;
+  platform: Platform;
+  connectionId: string;
+  externalAccountId: string;
+  status: "ok" | "empty" | "partial" | "failed";
+  importedCount: number;
+  truncated: boolean;
+  warnings: Array<{ code: string; message: string }>;
+  code?: string;
+  message?: string;
+  retryable: boolean;
+  needsReconnect: boolean;
+}
+
+export interface ConfirmImportResult {
+  importedCampaignCount: number;
+  adsStatus: "not_imported";
+  savedAccountKeys: string[];
+  outcomes: AccountSyncOutcome[];
+}
+
+export function connectProviderToPlatform(raw: string | null | undefined): Platform | null {
+  if (!raw) return null;
+  const cleaned = raw.trim().toLowerCase();
+  if (cleaned === "metaads" || cleaned === "meta") return "meta";
+  if (cleaned === "googleads" || cleaned === "google") return "google";
+  return null;
+}
+
+export function normalizeImportedAccountKey(platform: Platform, externalId: string): string {
+  const norm = normalizeExternalAccountId(platform, externalId);
+  const slug = norm.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  const combined = `${platform}_${slug || "acct"}`.slice(0, 40).replace(/_+$/g, "");
+  return combined.length >= 3 ? combined : `${platform}_acct`;
+}
+
+function normalizeCampaignKey(accountKey: string, externalCampaignId: string): string {
+  const slug = externalCampaignId
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const raw = `${accountKey}_${slug || "cmp"}`;
+  if (raw.length <= 64) return raw;
+  let hash = 2166136261;
+  for (let i = 0; i < raw.length; i++) {
+    hash ^= raw.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const suffix = `_${(hash >>> 0).toString(36)}`;
+  return `${raw.slice(0, 64 - suffix.length).replace(/_+$/g, "")}${suffix}`;
+}
+
+export function parseImportedCampaignsReply(raw: unknown): ImportedCampaignsReply {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("Campaign import response is invalid.");
+  }
+  const body = raw as Record<string, unknown>;
+  if (
+    (body.toolkit !== "metaads" && body.toolkit !== "googleads") ||
+    (body.platform !== "meta" && body.platform !== "google") ||
+    typeof body.connection_id !== "string" ||
+    typeof body.account_id !== "string" ||
+    !Array.isArray(body.campaigns)
+  ) {
+    throw new Error("Campaign import response is malformed.");
+  }
+  const warnings = Array.isArray(body.warnings)
+    ? body.warnings
+        .filter((w): w is Record<string, unknown> => !!w && typeof w === "object")
+        .map((w) => ({
+          code: typeof w.code === "string" ? w.code : "warning",
+          message: typeof w.message === "string" ? w.message : "Partial campaign reporting returned.",
+        }))
+    : [];
+  const campaigns: ImportedCampaignRow[] = body.campaigns
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
+    .map((c) => {
+      const status: CampaignStatus =
+        c.status === "ACTIVE" || c.status === "PAUSED" || c.status === "LIMITED"
+          ? c.status
+          : "PAUSED";
+      const actions = Array.isArray(c.meta_actions_json)
+        ? c.meta_actions_json
+            .filter(
+              (a): a is Record<string, unknown> =>
+                !!a && typeof a === "object" && typeof a.actionType === "string",
+            )
+            .map((a) => ({
+              actionType: a.actionType as string,
+              value: typeof a.value === "number" && Number.isFinite(a.value) ? a.value : 0,
+            }))
+        : null;
+      return {
+        external_campaign_id: String(c.external_campaign_id ?? ""),
+        name: String(c.name ?? c.external_campaign_id ?? "Campaign").slice(0, 160),
+        objective: String(c.objective ?? (body.platform === "meta" ? "OUTCOME_AWARENESS" : "SEARCH")).slice(0, 64),
+        status,
+        daily_budget_minor:
+          typeof c.daily_budget_minor === "number" && Number.isFinite(c.daily_budget_minor)
+            ? Math.max(0, Math.round(c.daily_budget_minor))
+            : 0,
+        spend_7d_minor:
+          typeof c.spend_7d_minor === "number" && Number.isFinite(c.spend_7d_minor)
+            ? Math.max(0, Math.round(c.spend_7d_minor))
+            : 0,
+        impressions_7d:
+          typeof c.impressions_7d === "number" && Number.isFinite(c.impressions_7d)
+            ? Math.max(0, Math.round(c.impressions_7d))
+            : 0,
+        clicks_7d:
+          typeof c.clicks_7d === "number" && Number.isFinite(c.clicks_7d)
+            ? Math.max(0, Math.round(c.clicks_7d))
+            : 0,
+        google_conversions:
+          typeof c.google_conversions === "number" && Number.isFinite(c.google_conversions)
+            ? Math.max(0, Math.round(c.google_conversions))
+            : null,
+        meta_actions_json: actions,
+        cpa_minor:
+          typeof c.cpa_minor === "number" && Number.isFinite(c.cpa_minor)
+            ? Math.max(0, Math.round(c.cpa_minor))
+            : null,
+      };
+    })
+    .filter((c) => c.external_campaign_id.length > 0);
+
+  const levelsObj =
+    body.levels && typeof body.levels === "object"
+      ? (body.levels as Record<string, unknown>)
+      : {};
+  return {
+    toolkit: body.toolkit,
+    platform: body.platform,
+    connection_id: body.connection_id,
+    account_id: body.account_id,
+    login_customer_id:
+      typeof body.login_customer_id === "string" ? body.login_customer_id : null,
+    currency: typeof body.currency === "string" && body.currency.trim() ? body.currency.trim().toUpperCase() : "HKD",
+    status: body.status === "empty" || body.status === "partial" ? body.status : "ok",
+    truncated: body.truncated === true,
+    synced_at: typeof body.synced_at === "string" ? body.synced_at : new Date().toISOString(),
+    levels: {
+      campaigns:
+        typeof levelsObj.campaigns === "number" ? levelsObj.campaigns : campaigns.length,
+      ads: null,
+    },
+    ads_status: "not_imported",
+    warnings,
+    campaigns,
+  };
+}
+
+export function buildAccountPickerModel(input: {
+  connectionsByPlatform: Partial<Record<Platform, ConnectedAssetsReply>>;
+  existingAccounts: readonly StoredRecord<AdAccountProfile>[];
+  focusPlatform: Platform | null;
+}): AccountPickerModel {
+  const { connectionsByPlatform, existingAccounts, focusPlatform } = input;
+  const visiblePlatforms: Platform[] = focusPlatform
+    ? [focusPlatform]
+    : (["meta", "google"] as const).filter((p) => {
+        const reply = connectionsByPlatform[p];
+        return !!reply && (reply.connected || reply.needs_reconnect || reply.connections.length > 0);
+      });
+
+  const existingByPlatform = new Map<Platform, Set<string>>([
+    ["meta", new Set()],
+    ["google", new Set()],
+  ]);
+  for (const acct of existingAccounts) {
+    existingByPlatform
+      .get(acct.profile.platform)
+      ?.add(normalizeExternalAccountId(acct.profile.platform, acct.profile.external_account_id).toLowerCase());
+  }
+
+  const providers: ProviderPickerSection[] = [];
+  const defaultSelectedIds: string[] = [];
+  let alreadyTrackedCount = 0;
+
+  for (const platform of visiblePlatforms) {
+    const reply = connectionsByPlatform[platform] ?? null;
+    if (!reply || (!reply.connected && !reply.needs_reconnect && reply.connections.length === 0)) {
+      providers.push({
+        platform,
+        connected: false,
+        needsReconnect: false,
+        state: "not_connected",
+        selectableAssets: [],
+        unavailableAssets: [],
+        connectionError: null,
+      });
+      continue;
+    }
+    if (reply.needs_reconnect) {
+      providers.push({
+        platform,
+        connected: false,
+        needsReconnect: true,
+        state: "expired",
+        selectableAssets: [],
+        unavailableAssets: [],
+        connectionError:
+          reply.connections.find((c) => c.error?.message)?.error?.message ?? null,
+      });
+      continue;
+    }
+
+    const existingSet = existingByPlatform.get(platform) ?? new Set<string>();
+    const selectableAssets: PickerSelectableAsset[] = [];
+    const unavailableAssets: PickerUnavailableAsset[] = [];
+    let connErr: string | null = null;
+
+    for (const conn of reply.connections) {
+      if (conn.error?.message && !connErr) connErr = conn.error.message;
+      const pinnedNorm = conn.selected
+        ? normalizeExternalAccountId(platform, conn.selected).toLowerCase()
+        : null;
+      for (const asset of conn.assets) {
+        const normalizedExternalId = normalizeExternalAccountId(platform, asset.value);
+        const pickerId = `${platform}:${conn.connection_id}:${asset.value}`;
+        const displayName = deriveDisplayNameFromAsset(asset, platform);
+        if (!asset.selectable) {
+          unavailableAssets.push({
+            pickerId,
+            platform,
+            displayName,
+            externalAccountId: normalizedExternalId,
+            permission: asset.permission || "unavailable",
+          });
+          continue;
+        }
+        const alreadyAdded = existingSet.has(normalizedExternalId.toLowerCase());
+        if (alreadyAdded) alreadyTrackedCount += 1;
+        const isPinned =
+          asset.value === conn.selected ||
+          (pinnedNorm !== null && normalizedExternalId.toLowerCase() === pinnedNorm);
+        selectableAssets.push({
+          pickerId,
+          connectionId: conn.connection_id,
+          connectionAccount: conn.account,
+          platform,
+          externalAccountId: normalizedExternalId,
+          loginCustomerId:
+            platform === "google" && asset.login_customer_id
+              ? normalizeGoogleCustomerId(asset.login_customer_id)
+              : null,
+          displayName,
+          currency: asset.currency?.trim().toUpperCase() || "HKD",
+          timezone: asset.timezone?.trim() || "Asia/Hong_Kong",
+          isPinned,
+          alreadyAdded,
+        });
+      }
+    }
+
+    if (selectableAssets.length === 1 && !selectableAssets[0]!.alreadyAdded) {
+      defaultSelectedIds.push(selectableAssets[0]!.pickerId);
+    }
+
+    const state: ProviderPickerSection["state"] =
+      selectableAssets.length > 0
+        ? "ready"
+        : unavailableAssets.length > 0
+          ? "unavailable"
+          : "empty";
+
+    providers.push({
+      platform,
+      connected: true,
+      needsReconnect: false,
+      state,
+      selectableAssets,
+      unavailableAssets,
+      connectionError: connErr,
+    });
+  }
+
+  return { visiblePlatforms, providers, defaultSelectedIds, alreadyTrackedCount };
+}
+
+function cleanToolkitAccountId(platform: Platform, externalAccountId: string): string {
+  const trimmed = externalAccountId.trim();
+  if (platform === "meta") {
+    return /^act_\d+$/.test(trimmed) ? trimmed : normalizeExternalAccountId("meta", trimmed);
+  }
+  return trimmed.replace(/^customers\//i, "").replace(/-/g, "");
+}
+
+function cleanLoginCustomerId(loginCustomerId: string | null): string | undefined {
+  if (!loginCustomerId) return undefined;
+  const digits = loginCustomerId.trim().replace(/^customers\//i, "").replace(/-/g, "");
+  return /^\d{10}$/.test(digits) ? digits : undefined;
+}
+
+export async function syncSingleAccountCampaigns(input: {
+  scope: DisplayScope;
+  call?: BridgeCaller;
+  account: StoredRecord<AdAccountProfile>;
+  connectionId: string;
+  existingCampaigns: StoredRecord<AdCampaignProfile>[];
+}): Promise<AccountSyncOutcome> {
+  const call: BridgeCaller =
+    input.call ?? ((verb, args, quiet = false) => serviceCall(input.scope, verb, args, quiet));
+  const { account, connectionId, existingCampaigns } = input;
+  const platform = account.profile.platform;
+  const toolkit = platform === "meta" ? "metaads" : "googleads";
+  const accountId = cleanToolkitAccountId(platform, account.profile.external_account_id);
+  const loginCustomerId =
+    platform === "google" ? cleanLoginCustomerId(account.profile.login_customer_id) : undefined;
+
+  try {
+    const raw = await call(
+      "connections.ads.campaigns",
+      {
+        toolkit,
+        connection_id: connectionId,
+        account_id: accountId,
+        ...(loginCustomerId ? { login_customer_id: loginCustomerId } : {}),
+      },
+      true,
+    );
+    const reply = parseImportedCampaignsReply(raw);
+    for (const row of reply.campaigns) {
+      const campaignKey = normalizeCampaignKey(account.profile.account_key, row.external_campaign_id);
+      const matchIndex = existingCampaigns.findIndex(
+        (c) =>
+          (c.profile.account_key === account.profile.account_key &&
+            c.profile.external_campaign_id === row.external_campaign_id) ||
+          c.profile.campaign_key === campaignKey,
+      );
+      const existing = matchIndex >= 0 ? existingCampaigns[matchIndex]! : null;
+      const profile: AdCampaignProfile = {
+        campaign_key: existing?.profile.campaign_key ?? campaignKey,
+        account_key: account.profile.account_key,
+        platform,
+        external_campaign_id: row.external_campaign_id,
+        name: row.name,
+        objective: row.objective,
+        status: row.status,
+        daily_budget_minor: row.daily_budget_minor,
+        spend_7d_minor: row.spend_7d_minor,
+        impressions_7d: row.impressions_7d,
+        clicks_7d: row.clicks_7d,
+        google_conversions: platform === "google" ? row.google_conversions : null,
+        meta_actions_json: platform === "meta" ? row.meta_actions_json : null,
+        cpa_minor: row.cpa_minor,
+        ad_sets_json: existing?.profile.ad_sets_json ?? [],
+      };
+      if (existing) {
+        const res = (await call(
+          "records.update",
+          {
+            table: "ad_campaigns",
+            record_id: existing.id,
+            expected_revision: existing.revision,
+            profile,
+          },
+          true,
+        )) as { record?: StoredRecord<AdCampaignProfile> } | null;
+        if (res?.record) existingCampaigns[matchIndex] = res.record;
+      } else {
+        const recordId = `camp-${profile.campaign_key}`;
+        const res = (await call(
+          "records.create",
+          {
+            table: "ad_campaigns",
+            record_id: recordId,
+            profile,
+          },
+          true,
+        )) as { record?: StoredRecord<AdCampaignProfile> } | null;
+        existingCampaigns.push(res?.record ?? { id: recordId, revision: 1, profile });
+      }
+    }
+    notifyWritten();
+    return {
+      accountKey: account.profile.account_key,
+      displayName: account.profile.display_name,
+      platform,
+      connectionId,
+      externalAccountId: account.profile.external_account_id,
+      status: reply.status === "partial" ? "partial" : reply.campaigns.length === 0 ? "empty" : "ok",
+      importedCount: reply.campaigns.length,
+      truncated: reply.truncated,
+      warnings: reply.warnings,
+      retryable: reply.status === "partial",
+      needsReconnect: false,
+    };
+  } catch (err) {
+    const e = err as { status?: number; code?: string; message?: string };
+    const code = typeof e?.code === "string" ? e.code : "sync_failed";
+    const status = typeof e?.status === "number" ? e.status : 500;
+    const needsReconnect = code === "needs_reconnect" || status === 401;
+    const retryable = !needsReconnect && code !== "account_not_authorized";
+    return {
+      accountKey: account.profile.account_key,
+      displayName: account.profile.display_name,
+      platform,
+      connectionId,
+      externalAccountId: account.profile.external_account_id,
+      status: "failed",
+      importedCount: 0,
+      truncated: false,
+      warnings: [],
+      code,
+      message: err instanceof Error ? err.message : "Could not import campaigns for this account.",
+      retryable,
+      needsReconnect,
+    };
+  }
+}
+
+export async function confirmAndImportAccounts(input: {
+  scope: DisplayScope;
+  call?: BridgeCaller;
+  picks: readonly AccountPickSelection[];
+  existingAccounts: readonly StoredRecord<AdAccountProfile>[];
+  existingCampaigns: readonly StoredRecord<AdCampaignProfile>[];
+  onProgress?: (info: { index: number; total: number; pick: AccountPickSelection }) => void;
+}): Promise<ConfirmImportResult> {
+  const call: BridgeCaller =
+    input.call ?? ((verb, args, quiet = false) => serviceCall(input.scope, verb, args, quiet));
+  const savedAccounts: Array<{
+    pick: AccountPickSelection;
+    account: StoredRecord<AdAccountProfile>;
+  }> = [];
+  const mutableAccounts = [...input.existingAccounts];
+  const mutableCampaigns = [...input.existingCampaigns];
+
+  // Phase 1: Persist/enable all selected ad_accounts BEFORE querying or writing ad_campaigns.
+  for (const pick of input.picks) {
+    const normExt = normalizeExternalAccountId(pick.platform, pick.externalAccountId).toLowerCase();
+    const expectedKey = normalizeImportedAccountKey(pick.platform, pick.externalAccountId);
+    const existingIdx = mutableAccounts.findIndex(
+      (a) =>
+        (a.profile.platform === pick.platform &&
+          normalizeExternalAccountId(a.profile.platform, a.profile.external_account_id).toLowerCase() ===
+            normExt) ||
+        a.profile.account_key === expectedKey,
+    );
+
+    if (existingIdx >= 0) {
+      let current = mutableAccounts[existingIdx]!;
+      const needsUpdate =
+        current.profile.status !== "active" ||
+        (pick.loginCustomerId && current.profile.login_customer_id !== pick.loginCustomerId);
+      if (needsUpdate) {
+        const updatedProfile: AdAccountProfile = {
+          ...current.profile,
+          status: "active",
+          login_customer_id: pick.loginCustomerId ?? current.profile.login_customer_id,
+        };
+        const res = (await call(
+          "records.update",
+          {
+            table: "ad_accounts",
+            record_id: current.id,
+            expected_revision: current.revision,
+            profile: updatedProfile,
+          },
+          true,
+        )) as { record?: StoredRecord<AdAccountProfile> } | null;
+        current = res?.record ?? { ...current, revision: current.revision + 1, profile: updatedProfile };
+        mutableAccounts[existingIdx] = current;
+      }
+      savedAccounts.push({ pick, account: current });
+      continue;
+    }
+
+    const validated = validateAccountInput({
+      platform: pick.platform,
+      external_account_id: normalizeExternalAccountId(pick.platform, pick.externalAccountId),
+      login_customer_id: pick.loginCustomerId,
+      display_name: pick.displayName,
+      currency: pick.currency || "HKD",
+      timezone: pick.timezone || "Asia/Hong_Kong",
+      daily_guardrail_minor: 150000,
+    });
+    if (!validated.ok) {
+      throw new Error(validated.error);
+    }
+    const profile: AdAccountProfile = {
+      ...validated.value,
+      account_key: expectedKey,
+    };
+    const recordId = `acct-${profile.account_key}`;
+    const res = (await call(
+      "records.create",
+      {
+        table: "ad_accounts",
+        record_id: recordId,
+        profile,
+      },
+      true,
+    )) as { record?: StoredRecord<AdAccountProfile> } | null;
+    const created: StoredRecord<AdAccountProfile> = res?.record ?? {
+      id: recordId,
+      revision: 1,
+      profile,
+    };
+    mutableAccounts.push(created);
+    savedAccounts.push({ pick, account: created });
+  }
+
+  // Phase 2: Sequentially import campaigns + 7-day metrics for each confirmed account.
+  const outcomes: AccountSyncOutcome[] = [];
+  let importedCampaignCount = 0;
+  for (let i = 0; i < savedAccounts.length; i += 1) {
+    const entry = savedAccounts[i]!;
+    input.onProgress?.({ index: i + 1, total: savedAccounts.length, pick: entry.pick });
+    const outcome = await syncSingleAccountCampaigns({
+      scope: input.scope,
+      call,
+      account: entry.account,
+      connectionId: entry.pick.connectionId,
+      existingCampaigns: mutableCampaigns,
+    });
+    importedCampaignCount += outcome.importedCount;
+    outcomes.push(outcome);
+  }
+
+  // Phase 3: Append one audit summary event.
+  const suffix = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`;
+  const event: AuditEventProfile = {
+    event_key: `evt_${suffix}`,
+    kind: "sync",
+    summary: `Tracked ${savedAccounts.length} account(s); imported ${importedCampaignCount} campaign(s) (Campaigns only — individual ads not imported)`,
+    summary_zh: `已追蹤 ${savedAccounts.length} 個帳號並匯入 ${importedCampaignCount} 個廣告活動（僅含廣告活動層級，尚未匯入個別廣告）`,
+    occurred_at: new Date().toISOString().slice(0, 16).replace("T", " "),
+  };
+  await call(
+    "records.create",
+    {
+      table: "audit_events",
+      record_id: `evt-${suffix}`,
+      profile: event,
+    },
+    true,
+  );
+  notifyWritten();
+
+  return {
+    importedCampaignCount,
+    adsStatus: "not_imported",
+    savedAccountKeys: savedAccounts.map((s) => s.account.profile.account_key),
+    outcomes,
+  };
 }

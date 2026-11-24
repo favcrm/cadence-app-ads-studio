@@ -328,7 +328,7 @@ export function validateAccountInput(input: {
   }
 
   const slug = ext.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-  const accountKey = `${input.platform}_${slug}`.slice(0, 64);
+  const accountKey = `${input.platform}_${slug}`.slice(0, 40).replace(/_+$/g, "");
   return {
     ok: true,
     value: {

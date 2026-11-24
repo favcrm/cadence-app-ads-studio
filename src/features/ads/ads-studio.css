@@ -674,6 +674,97 @@
   border-top: 1px solid var(--color-ink-700);
 }
 
+.ads-picker-panel {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 0.625rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 42%, var(--color-ink-700));
+  background: var(--color-ink-900);
+}
+
+.ads-picker-provider {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-ink-700);
+  background: var(--color-ink-875);
+}
+
+.ads-picker-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ads-picker-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-ink-700);
+  background: var(--color-ink-850);
+  cursor: pointer;
+  scroll-margin-block-end: 124px;
+}
+
+.ads-picker-item[data-selected="true"] {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-ink-850));
+}
+
+.ads-picker-item[data-disabled="true"] {
+  opacity: 0.68;
+  cursor: default;
+}
+
+.ads-picker-optout {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-label);
+  color: var(--color-ink-300);
+  cursor: pointer;
+  scroll-margin-block-end: 124px;
+}
+
+.ads-picker-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  margin-inline: -4px;
+  border-top: 1px solid var(--color-ink-700);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--color-ink-900) 94%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.ads-sync-outcomes {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.ads-sync-outcome-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 10px;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-ink-700);
+  background: var(--color-ink-875);
+}
+
 @container (max-width: 860px) {
   .ads-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

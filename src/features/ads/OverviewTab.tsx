@@ -15,6 +15,7 @@ import {
 } from "../../domain/ads";
 import { fmtCompactMoney, fmtMoney } from "../../domain/money";
 import { useLocale } from "./locale";
+import type { ConnectedAssetsReply } from "./records";
 import { StatusPill, statusTone } from "./StatusPill";
 
 export function OverviewTab({
@@ -22,6 +23,7 @@ export function OverviewTab({
   campaigns,
   proposals,
   auditEvents,
+  connectionsByPlatform,
   canWrite,
   seeding,
   range,
@@ -30,6 +32,7 @@ export function OverviewTab({
   onPlatformChange,
   onSeedStarter,
   onAddAccount,
+  onChooseConnectedAccounts,
   onGoSection,
   onInspectCampaign,
 }: {
@@ -37,6 +40,7 @@ export function OverviewTab({
   campaigns: readonly StoredRecord<AdCampaignProfile>[];
   proposals: readonly StoredRecord<AdProposalProfile>[];
   auditEvents: readonly StoredRecord<AuditEventProfile>[];
+  connectionsByPlatform?: Partial<Record<Platform, ConnectedAssetsReply>>;
   canWrite: boolean;
   seeding: boolean;
   range: string;
@@ -45,19 +49,80 @@ export function OverviewTab({
   onPlatformChange: (next: "all" | Platform) => void;
   onSeedStarter: () => void;
   onAddAccount: () => void;
+  onChooseConnectedAccounts?: () => void;
   onGoSection: (section: "campaigns" | "proposals") => void;
   onInspectCampaign: (id: string) => void;
 }) {
   const { locale, canvas, t } = useLocale();
 
   if (accounts.length === 0 && campaigns.length === 0) {
+    const connectedPlatforms = (["meta", "google"] as const).filter(
+      (p) => connectionsByPlatform?.[p]?.connected === true,
+    );
+    const expiredPlatforms = (["meta", "google"] as const).filter(
+      (p) => connectionsByPlatform?.[p]?.needs_reconnect === true,
+    );
+    const hasConnectedPlatform = connectedPlatforms.length > 0 || expiredPlatforms.length > 0;
+    const selectableTotal = connectedPlatforms.reduce(
+      (sum, p) =>
+        sum +
+        (connectionsByPlatform?.[p]?.connections.reduce(
+          (acc, c) => acc + c.assets.filter((a) => a.selectable).length,
+          0,
+        ) ?? 0),
+      0,
+    );
+
+    if (canWrite && hasConnectedPlatform && onChooseConnectedAccounts) {
+      return (
+        <EmptyState name="overview" title={t("Choose ad accounts")}>
+          <div style={{ display: "grid", gap: "12px" }}>
+            <p style={{ margin: 0 }}>
+              {connectedPlatforms.length > 0
+                ? t(
+                    "Your ad platforms are linked. Choose which ad accounts to track and import their campaigns into this workspace.",
+                  )
+                : t(
+                    "Your linked ad platform needs to reconnect before choosing ad accounts.",
+                  )}
+            </p>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+              {connectedPlatforms.map((p) => (
+                <StatusPill key={p} tone="ok">
+                  {p === "meta" ? t("Meta Ads") : t("Google Ads")} · {t("Connected")}
+                </StatusPill>
+              ))}
+              {expiredPlatforms.map((p) => (
+                <StatusPill key={p} tone="warn">
+                  {p === "meta" ? t("Meta Ads") : t("Google Ads")} · {t("Connection expired")}
+                </StatusPill>
+              ))}
+              {selectableTotal > 0 && (
+                <span className="text-micro text-ink-400 num">
+                  {selectableTotal} {t("selectable account(s)")}
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <Button variant="primary" onClick={onChooseConnectedAccounts}>
+                {t("Choose ad accounts")}
+              </Button>
+              <Button loading={seeding} onClick={onSeedStarter}>
+                {t("Load sample workspace")}
+              </Button>
+            </div>
+          </div>
+        </EmptyState>
+      );
+    }
+
     return (
       <EmptyState name="overview" title={t("Set up Ads Studio")}>
         {canWrite ? (
           <div style={{ display: "grid", gap: "12px" }}>
             <p style={{ margin: 0 }}>
               {t(
-                "Add a Meta Ads or Google Ads account to track real guardrails and Workspace media pointers, sync live campaigns via chat, or load the synthetic sample dataset.",
+                "Connect a Meta Ads or Google Ads account to choose accounts, track spend limits, and import campaigns, or load the synthetic sample dataset.",
               )}
             </p>
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>

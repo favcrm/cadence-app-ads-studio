@@ -16,6 +16,9 @@ const SECTIONS: { id: SectionId; en: string; zh: string }[] = [
 
 const VIEW_PRESETS: Record<string, { section: SectionId; params: Record<string, string> }> = {
   default: { section: "overview", params: {} },
+  oauth_return_google: { section: "accounts", params: { connect_provider: "googleads" } },
+  oauth_return_meta: { section: "accounts", params: { connect_provider: "metaads" } },
+  partial_retry: { section: "overview", params: {} },
   campaign_audit: {
     section: "campaigns",
     params: { range: "7d", platform: "meta", status: "LIMITED" },
@@ -42,6 +45,7 @@ const TABLES = new Map<string, StoredRow[]>([
 ]);
 
 let seq = 1;
+let googleFailOnce = false;
 const state = {
   nonce: randomNonce(),
   generation: 1,
@@ -130,6 +134,9 @@ function pushScreen(): void {
       "records.create",
       "records.update",
       "records.batch",
+      "connections.assets",
+      "connections.connect",
+      "connections.ads.campaigns",
       "screen.route.patch",
     ],
     presentation_locale: state.locale,
@@ -252,6 +259,175 @@ function handleCall(id: string, verb: string, args: Record<string, unknown>): vo
     return;
   }
 
+  if (verb === "connections.assets") {
+    if (args.toolkit === "metaads") {
+      okReply(id, {
+        toolkit: "metaads",
+        connected: true,
+        needs_reconnect: false,
+        connections: [
+          {
+            connection_id: "con_pv_meta",
+            account: "ads@specialtyroast.example",
+            kind: "meta_ad_account",
+            selected: "act_872629204289636",
+            assets: [
+              {
+                value: "act_872629204289636",
+                label: "Roastery Main Meta",
+                permission: "active",
+                selectable: true,
+                currency: "HKD",
+                timezone: "Asia/Hong_Kong",
+              },
+              {
+                value: "act_112233445566",
+                label: "Holiday Pop-up Meta",
+                permission: "active",
+                selectable: true,
+                currency: "HKD",
+                timezone: "Asia/Hong_Kong",
+              },
+            ],
+          },
+        ],
+      });
+      return;
+    }
+    if (args.toolkit === "googleads") {
+      okReply(id, {
+        toolkit: "googleads",
+        connected: true,
+        needs_reconnect: false,
+        connections: [
+          {
+            connection_id: "con_pv_google",
+            account: "mcc@specialtyroast.example",
+            kind: "google_ads_customer",
+            selected: "4128903310",
+            assets: [
+              {
+                value: "9012240018",
+                label: "Agency MCC",
+                permission: "manager",
+                selectable: false,
+                currency: "HKD",
+                timezone: "Asia/Hong_Kong",
+              },
+              {
+                value: "4128903310",
+                label: "Brand HK Client",
+                permission: "accessible",
+                selectable: true,
+                currency: "HKD",
+                timezone: "Asia/Hong_Kong",
+                login_customer_id: "9012240018",
+              },
+            ],
+          },
+        ],
+      });
+      return;
+    }
+  }
+
+  if (verb === "connections.connect") {
+    const toolkit = args.toolkit === "googleads" ? "googleads" : "metaads";
+    state.section = "accounts";
+    state.params = { connect_provider: toolkit };
+    okReply(id, { started: true });
+    pushScreen();
+    renderChrome();
+    return;
+  }
+
+  if (verb === "connections.ads.campaigns") {
+    if (args.toolkit === "googleads" && googleFailOnce) {
+      googleFailOnce = false;
+      return failReply(id, "rate_limited", "Google Ads quota throttled briefly. Retry sync to finish.");
+    }
+    if (args.toolkit === "metaads") {
+      okReply(id, {
+        toolkit: "metaads",
+        platform: "meta",
+        connection_id: String(args.connection_id ?? "con_pv_meta"),
+        account_id: String(args.account_id ?? "act_872629204289636"),
+        login_customer_id: null,
+        currency: "HKD",
+        status: "ok",
+        truncated: false,
+        synced_at: new Date().toISOString(),
+        levels: { campaigns: 2, ads: null },
+        ads_status: "not_imported",
+        warnings: [],
+        campaigns: [
+          {
+            external_campaign_id: "1202091100",
+            name: "Single Origin Bean Subscription",
+            objective: "OUTCOME_SALES",
+            status: "ACTIVE",
+            daily_budget_minor: 50000,
+            spend_7d_minor: 285000,
+            impressions_7d: 24500,
+            clicks_7d: 790,
+            google_conversions: null,
+            meta_actions_json: [
+              { actionType: "purchase", value: 22 },
+              { actionType: "lead", value: 9 },
+            ],
+            cpa_minor: 12955,
+          },
+          {
+            external_campaign_id: "1202091199",
+            name: "Winter Tasting Waitlist (Paused)",
+            objective: "OUTCOME_LEADS",
+            status: "PAUSED",
+            daily_budget_minor: 25000,
+            spend_7d_minor: 0,
+            impressions_7d: 0,
+            clicks_7d: 0,
+            google_conversions: null,
+            meta_actions_json: [],
+            cpa_minor: null,
+          },
+        ],
+      });
+      return;
+    }
+    if (args.toolkit === "googleads") {
+      okReply(id, {
+        toolkit: "googleads",
+        platform: "google",
+        connection_id: String(args.connection_id ?? "con_pv_google"),
+        account_id: String(args.account_id ?? "4128903310"),
+        login_customer_id: typeof args.login_customer_id === "string" ? args.login_customer_id : "9012240018",
+        currency: "HKD",
+        status: "ok",
+        truncated: false,
+        synced_at: new Date().toISOString(),
+        levels: { campaigns: 1, ads: null },
+        ads_status: "not_imported",
+        warnings: [],
+        campaigns: [
+          {
+            external_campaign_id: "88019944",
+            name: "Search — Specialty Beans HK",
+            objective: "SEARCH",
+            status: "ACTIVE",
+            daily_budget_minor: 60000,
+            spend_7d_minor: 310000,
+            impressions_7d: 19400,
+            clicks_7d: 880,
+            google_conversions: 31,
+            meta_actions_json: null,
+            cpa_minor: 10000,
+          },
+        ],
+      });
+      return;
+    }
+  }
+
   failReply(id, "forbidden", `Operation ${verb} is unavailable`);
 }
 
@@ -313,6 +489,7 @@ btnSurface.addEventListener("click", () => {
 });
 
 selView.addEventListener("change", () => {
+  googleFailOnce = selView.value === "partial_retry";
   const preset = VIEW_PRESETS[selView.value] ?? VIEW_PRESETS.default;
   state.section = preset.section;
   state.params = { ...preset.params };
