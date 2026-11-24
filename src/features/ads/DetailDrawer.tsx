@@ -309,33 +309,45 @@ function CampaignDrawer({
     {
       id: "sets",
       label: t("Ad Sets / Groups"),
-      panel: (
-        <DataTable
-          label={t("Ad Sets / Groups")}
-          rows={c.ad_sets_json}
-          rowKey={(r) => r.name}
-          columns={[
-            { key: "name", header: t("Campaign Name"), cell: (r) => <strong>{r.name}</strong> },
-            {
-              key: "status",
-              header: t("Status"),
-              cell: (r) => <StatusPill tone={statusTone(r.status)}>{r.status}</StatusPill>,
-            },
-            {
-              key: "budget",
-              header: t("Budget/d"),
-              cellClassName: "ads-num-col num",
-              cell: (r) => fmtMoney(r.budgetMinor, currency),
-            },
-            {
-              key: "spend",
-              header: t("7d Spend"),
-              cellClassName: "ads-num-col num",
-              cell: (r) => fmtMoney(r.spendMinor, currency),
-            },
-          ]}
-        />
-      ),
+      panel:
+        c.ad_sets_json.length === 0 ? (
+          <div className="ads-card" style={{ padding: "14px" }}>
+            <strong style={{ color: "var(--color-ink-100)" }}>
+              {t("Campaigns only — individual ads not imported")}
+            </strong>
+            <p className="text-micro text-ink-400" style={{ margin: 0 }}>
+              {t(
+                "This campaign sync captures campaign settings and 7-day metrics. Ad sets, ad groups, and individual ads are not imported yet.",
+              )}
+            </p>
+          </div>
+        ) : (
+          <DataTable
+            label={t("Ad Sets / Groups")}
+            rows={c.ad_sets_json}
+            rowKey={(r) => r.name}
+            columns={[
+              { key: "name", header: t("Campaign Name"), cell: (r) => <strong>{r.name}</strong> },
+              {
+                key: "status",
+                header: t("Status"),
+                cell: (r) => <StatusPill tone={statusTone(r.status)}>{r.status}</StatusPill>,
+              },
+              {
+                key: "budget",
+                header: t("Budget/d"),
+                cellClassName: "ads-num-col num",
+                cell: (r) => fmtMoney(r.budgetMinor, currency),
+              },
+              {
+                key: "spend",
+                header: t("7d Spend"),
+                cellClassName: "ads-num-col num",
+                cell: (r) => fmtMoney(r.spendMinor, currency),
+              },
+            ]}
+          />
+        ),
     },
     ...(canWrite
       ? [

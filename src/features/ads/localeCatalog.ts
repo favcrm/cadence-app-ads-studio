@@ -239,4 +239,64 @@ export const zhHK: Record<string, string> = {
   "Search, YouTube & Performance Max accounts": "搜尋、YouTube 與最高成效廣告帳號",
   "For Business ad accounts": "TikTok 商業廣告帳號",
   "Campaign Manager accounts": "LinkedIn 行銷活動管理員帳號",
+  "Choose ad accounts": "選擇廣告帳號",
+  "Connect a Meta Ads or Google Ads account to choose accounts, track spend limits, and import campaigns, or load the synthetic sample dataset.":
+    "連結 Meta Ads 或 Google Ads 帳號以選擇要追蹤的帳號、設定花費上限並匯入廣告活動，或載入合成範例資料。",
+  "Your ad platforms are linked. Choose which ad accounts to track and import their campaigns into this workspace.":
+    "廣告平台已連結完成。請選擇要追蹤的廣告帳號並將廣告活動匯入此工作區。",
+  "Your linked ad platform needs to reconnect before choosing ad accounts.":
+    "已連結的廣告平台授權已過期，請先重新連結再選擇廣告帳號。",
+  Connected: "已連結",
+  "selectable account(s)": "個可選廣告帳號",
+  "Campaign import summary": "廣告活動匯入摘要",
+  "Campaigns imported:": "已匯入廣告活動：",
+  "Campaigns only — individual ads not imported": "僅匯入廣告活動層級 — 尚未匯入個別廣告",
+  "Some accounts need attention. Retry sync on individual accounts without reconnecting.":
+    "部分帳號需要處理。請針對個別帳號點擊「重試同步」，無須重新連結平台。",
+  "Campaign settings and 7-day metrics are saved. Individual ad creatives stay out of scope.":
+    "廣告活動設定與過去 7 天成效數據已儲存，個別廣告素材不在本次匯入範圍內。",
+  "Sync failed": "同步失敗",
+  "Partial metrics": "成效數據部分缺失",
+  "No campaigns": "沒有廣告活動",
+  Synced: "已同步",
+  "campaign(s)": "個廣告活動",
+  "Retry sync": "重試同步",
+  "View campaigns": "檢視廣告活動",
+  Dismiss: "關閉提示",
+  "No accounts returned": "未回傳廣告帳號",
+  "No selectable accounts": "無可選取帳號",
+  "Do not track Meta Ads yet": "暫不追蹤 Meta Ads",
+  "Do not track Google Ads yet": "暫不追蹤 Google Ads",
+  "This platform authorization expired. Reconnect without losing your other selections.":
+    "此平台授權已過期。重新連結不會遺失您在其他平台的已選取項目。",
+  "Connect this platform to choose its ad accounts and import campaigns.":
+    "連結此平台即可選擇廣告帳號並匯入廣告活動。",
+  "No selectable ad accounts were returned for this connection.":
+    "此連線未回傳任何可選取的廣告帳號。",
+  "Only manager (MCC) accounts were found. Connect a login with direct client ad accounts underneath it.":
+    "僅偵測到管理員帳號（MCC）。請使用底下包含一般客戶廣告帳號的登入進行連結。",
+  "Returned ad accounts are disabled or lack read access.": "回傳的廣告帳號已停用或缺少讀取權限。",
+  "Already tracked": "已追蹤中",
+  Recommended: "建議項目",
+  "Manager account": "管理員帳號",
+  Unavailable: "無法選取",
+  "Could not track selected accounts.": "無法儲存選取的廣告帳號。",
+  "Platform link notice": "平台連結通知",
+  "Connection was not completed. Your saved accounts and choices were kept.":
+    "未完成平台連結，已保留您原先儲存的帳號與選取項目。",
+  "Existing tracked accounts stay active. Confirm selections below to save accounts and import their campaigns.":
+    "已追蹤的帳號將維持啟用狀態。請確認以下選取項目以儲存帳號並匯入廣告活動。",
+  "Confirm your selections below to start tracking accounts and import their existing campaigns.":
+    "請確認以下選取項目以開始追蹤帳號並匯入現有廣告活動。",
+  "Show all platforms": "顯示全部平台",
+  "Checking connected ad accounts…": "正在檢查已連結的廣告帳號…",
+  "Connect Meta Ads or Google Ads first to choose ad accounts.":
+    "請先連結 Meta Ads 或 Google Ads 平台，再選擇廣告帳號。",
+  "Importing campaigns…": "正在匯入廣告活動…",
+  "Do this later": "稍後再說",
+  "Track 1 account": "追蹤 1 個帳號",
+  "Track selected accounts": "追蹤已選取帳號",
+  Sync: "同步",
+  "This campaign sync captures campaign settings and 7-day metrics. Ad sets, ad groups, and individual ads are not imported yet.":
+    "此同步包含廣告活動設定與過去 7 天成效指標，尚未匯入廣告組合、廣告群組及個別廣告。",
 };

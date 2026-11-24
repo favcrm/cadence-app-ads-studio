@@ -16,18 +16,18 @@
     {
       "name": "client.js",
       "media_type": "text/javascript",
-      "size": 175229,
-      "sha256": "sha256:830bafc495fdaf90209350f7537c7c793ee734cfd9bf9b14c8c57c7f032e2fc6"
+      "size": 205003,
+      "sha256": "sha256:0206c1c94e6dcdee0c183bef17e35c73ee654b48446ca6cfafb5cc30f5391004"
     },
     {
       "name": "ads-studio.css",
       "media_type": "text/css",
-      "size": 33825,
-      "sha256": "sha256:d692e9fdb6d927f07cbb72875271a70d9f5aae4ca1ffbf17331e6e54476102b6"
+      "size": 35471,
+      "sha256": "sha256:b08dbf24c4deed4c8f5b32e068b95e1905714401eed377ab51760ca36a63eb2a"
     }
   ],
   "provenance": {
-    "source_digest": "sha256:2b3eb9754997c226027de15b46bac9b3cff13d9c0e70046fdb83c9cd07019eee",
+    "source_digest": "sha256:57b05aedb8b4f56edaf9e23ada613946fbec48da3085d8e02cb7afe80888b1df",
     "sdk_digest": "sha256:fd65c974511e63b3996e9fa7e438fb4e39df5f508d11636116ef150fcc123e35",
     "toolchain_digest": "sha256:e21cfc8222db408abe6ba5a482520639d9cf4b96481c19aff4b4246af8a65e42"
   },
@@ -43,7 +43,8 @@
     "records.update",
     "records.batch",
     "connections.assets",
-    "connections.connect"
+    "connections.connect",
+    "connections.ads.campaigns"
   ],
   "navigation": {
     "section_query": "ads",

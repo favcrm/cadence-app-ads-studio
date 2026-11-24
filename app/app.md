@@ -1,7 +1,7 @@
 ---
 app: ads-studio
 title: Ads Studio
-version: '0.6.0'
+version: '0.7.0'
 summary: Cross-channel Meta Ads and Google Ads console for spend guardrails, owner-approved changes, and Workspace media pointers.
 needs:
   connections: []
@@ -35,6 +35,13 @@ listing:
       tagline: 統一檢視 Meta 與 Google 廣告支出並以負責人審批控管變更
       summary: 在同一工作區追蹤 Meta 與 Google 廣告活動、設定每日支出護欄、審批預算與狀態調整，並管理工作區素材指標。
   changes:
+    - version: '0.7.0'
+      notes:
+        - Open focused Accounts picker immediately on post-OAuth return with sole preselect and explicit multi-select
+        - Persist selected ad accounts first and import existing campaigns plus 7-day metrics sequentially via host read verb
+        - Distinguish Google MCC manager accounts from client accounts, expired connections, and empty account lists
+        - Keep individual ad import out of scope (Campaigns only) with per-account Retry sync on partial failures
+      keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
     - version: '0.6.0'
       notes:
         - Simplify Accounts with platform-grouped enabled or disabled toggles and inline daily spend limit editing
@@ -59,10 +66,6 @@ listing:
         - Add real Meta and Google ad-account onboarding with multi-currency formatting and pointer validation
         - Add interactive Google Search RSA half-width CJK and Meta ad copy policy checkers in Creatives
         - Add bundled ads-sync skill and update specialist skills for media discovery and connected approvals
-      keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
-    - version: '0.2.0'
-      notes:
-        - Add four bundled assistant skills for spend audits, staged proposals, and creative policy checks
       keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
 ---
 
@@ -92,7 +95,7 @@ Account selection (`Settings -> Connections` asset pinning) and qualified media 
 
 ## Assistant access
 
-The assistant reads and stages records through the five `records.*` verbs (`records.list`, `records.show`, `records.create`, `records.update`, and `records.batch`) declared by `screens/ads-studio/screens.json`. The UI screen also declares owner-only `connections.assets` so the onboarding drawer can list authorized Composio ad accounts without ever reading OAuth credentials. All tables require owner reads, and staged writes await explicit owner approval before committing.
+The assistant reads and stages records through the five `records.*` verbs (`records.list`, `records.show`, `records.create`, `records.update`, and `records.batch`) declared by `screens/ads-studio/screens.json`. The UI screen also declares owner-only `connections.assets`, `connections.connect`, and `connections.ads.campaigns` so it can start platform links, list authorized ad accounts, and import existing campaigns plus 7-day reporting without ever reading OAuth credentials. All tables require owner reads, and staged writes await explicit owner approval before committing.
 
 Five bundled skills under `skills/` guide assistant workflows:
 - `ads-operator` — routes paid-acquisition questions and enforces owner-approval, multi-currency minor-unit, and separated-conversion rules
