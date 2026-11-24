@@ -26,6 +26,7 @@ describe("ads-studio built screen bundle contract", () => {
       "records.update",
       "records.batch",
       "connections.assets",
+      "connections.connect",
     ]);
     expect(decl.views).toEqual(views);
     expect(decl.views.map((v) => v.id)).toEqual([

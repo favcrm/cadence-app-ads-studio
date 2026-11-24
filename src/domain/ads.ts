@@ -343,8 +343,8 @@ export function validateAccountInput(input: {
       daily_guardrail_minor: input.daily_guardrail_minor,
       scopes_text:
         input.platform === "meta"
-          ? "ads_read, ads_management (connected via Composio)"
-          : "adwords (connected via Composio · write gate active)",
+          ? "ads_read, ads_management"
+          : "adwords · write gate active",
     },
   };
 }

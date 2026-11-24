@@ -1,116 +1,336 @@
-import { Button, Detail } from "@cadence/screen-ui";
-import { useState } from "react";
-import type { AdAccountProfile, StoredRecord } from "../../domain/ads";
+import { Button, Detail, Notice } from "@cadence/screen-ui";
+import { useMemo, useState } from "react";
+import type { AdAccountProfile, Platform, StoredRecord } from "../../domain/ads";
+import { fmtMoney } from "../../domain/money";
 import { useLocale } from "./locale";
-import { StatusPill, statusTone } from "./StatusPill";
+import {
+  mergePlatformAccounts,
+  type ConnectedAssetsReply,
+  type MergedPlatformAccount,
+} from "./records";
+import { StatusPill } from "./StatusPill";
+
+type AccountFilter = "all" | "enabled" | "disabled";
+
+const PLATFORM_LABELS: Readonly<Record<Platform, string>> = {
+  meta: "Meta Ads",
+  google: "Google Ads",
+};
 
 export function AccountsTab({
   accounts,
+  connectionsByPlatform,
+  loadingConnections,
+  connectionError,
   canWrite,
+  canConnect,
+  onRefresh,
   onSaveGuardrail,
+  onToggleAccount,
+  onConnectPlatform,
   onAddAccount,
 }: {
   accounts: readonly StoredRecord<AdAccountProfile>[];
+  connectionsByPlatform: Partial<Record<Platform, ConnectedAssetsReply>>;
+  loadingConnections: boolean;
+  connectionError: string | null;
   canWrite: boolean;
+  canConnect: boolean;
+  onRefresh: () => Promise<void>;
   onSaveGuardrail: (account: StoredRecord<AdAccountProfile>, dailyMinor: number) => Promise<void>;
+  onToggleAccount: (item: MergedPlatformAccount, nextEnabled: boolean) => Promise<void>;
+  onConnectPlatform: (platform: Platform) => Promise<void>;
   onAddAccount: () => void;
 }) {
   const { t } = useLocale();
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState<AccountFilter>("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftMajor, setDraftMajor] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [reconnecting, setReconnecting] = useState<Platform | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
+
+  const merged = useMemo(
+    () => mergePlatformAccounts(accounts, connectionsByPlatform),
+    [accounts, connectionsByPlatform],
+  );
+
+  const enabledCount = merged.filter((m) => m.enabled).length;
+  const disabledCount = merged.length - enabledCount;
+  const showFilterPills = merged.length >= 3;
+
+  const visibleItems = useMemo(() => {
+    if (filter === "enabled") return merged.filter((m) => m.enabled);
+    if (filter === "disabled") return merged.filter((m) => !m.enabled);
+    return merged;
+  }, [merged, filter]);
+
+  const groupedPlatforms = (["meta", "google"] as const).filter((platform) => {
+    const hasItems = visibleItems.some((m) => m.platform === platform);
+    const needsReconnect = connectionsByPlatform[platform]?.needs_reconnect === true;
+    return hasItems || (filter === "all" && needsReconnect);
+  });
+
+  const startLimitEdit = (item: MergedPlatformAccount) => {
+    setEditingId(item.id);
+    setDraftMajor(String(Math.round(item.guardrailMinor / 100)));
+    setActionErr(null);
+  };
+
+  const commitLimitEdit = async (item: MergedPlatformAccount) => {
+    if (!item.record) return;
+    const major = Math.max(100, Math.round(Number(draftMajor) || item.guardrailMinor / 100));
+    setSavingId(item.id);
+    setActionErr(null);
+    try {
+      await onSaveGuardrail(item.record, major * 100);
+      setEditingId(null);
+    } catch (err) {
+      setActionErr(err instanceof Error ? err.message : t("Could not update daily limit."));
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   return (
     <div style={{ display: "grid", gap: "18px" }}>
       <div className="ads-row-between">
         <div className="ads-title-stack">
-          <h3 className="text-cardtitle">{t("Composio connections & pinned ad accounts")}</h3>
+          <h3 className="text-cardtitle">{t("Ad accounts")}</h3>
           <span className="text-micro text-ink-500">
-            {t(
-              "Host credentials and pinned Meta / Google Ads accounts live in Settings → Connections; daily guardrails store in app-storage/v1.",
-            )}
+            {t("Toggle accounts on to track spend and stage changes.")}
           </span>
         </div>
-        {canWrite && (
-          <Button size="sm" variant="primary" onClick={onAddAccount}>
-            + {t("Add ad account")}
-          </Button>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <button
+            type="button"
+            className="ads-icon-btn"
+            aria-label={t("Refresh accounts")}
+            title={t("Refresh accounts")}
+            disabled={loadingConnections}
+            onClick={() => void onRefresh()}
+          >
+            ↻
+          </button>
+          {canWrite && (
+            <Button size="sm" variant="primary" onClick={onAddAccount}>
+              + {t("Add")}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {accounts.length === 0 ? (
+      {connectionError && (
+        <Notice state="error" onRetry={() => void onRefresh()}>
+          <div style={{ display: "grid", gap: "3px" }}>
+            <strong>{t("Could not refresh connected accounts")}</strong>
+            <span className="text-micro">{connectionError}</span>
+          </div>
+        </Notice>
+      )}
+
+      {actionErr && (
+        <p role="alert" className="text-micro" style={{ color: "var(--color-fail)", margin: 0 }}>
+          {actionErr}
+        </p>
+      )}
+
+      {showFilterPills && (
+        <div className="ads-chips" role="group" aria-label={t("Filter accounts")}>
+          {(
+            [
+              ["all", `${t("All")} (${merged.length})`],
+              ["enabled", `${t("Enabled")} (${enabledCount})`],
+              ["disabled", `${t("Disabled")} (${disabledCount})`],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className="ads-chip"
+              aria-pressed={filter === id}
+              onClick={() => setFilter(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {merged.length === 0 && groupedPlatforms.length === 0 ? (
         <article className="ads-card">
-          <div className="text-secondary text-ink-300">
-            {t("No ad accounts pinned in this workspace yet. Pin a Meta Ads ad account or Google Ads customer ID in Settings → Connections, then add it or sync in chat.")}
+          <div className="ads-title-stack">
+            <strong style={{ color: "var(--color-ink-100)" }}>
+              {t("No ad accounts connected yet")}
+            </strong>
+            <span className="text-secondary text-ink-400">
+              {t("Connect Meta Ads or Google Ads to bring your accounts into this workspace.")}
+            </span>
+          </div>
+          {canWrite && (
+            <div>
+              <Button size="sm" variant="primary" onClick={onAddAccount}>
+                + {t("Add ad account")}
+              </Button>
+            </div>
+          )}
+        </article>
+      ) : visibleItems.length === 0 && groupedPlatforms.length === 0 ? (
+        <article className="ads-card">
+          <div className="ads-row-between">
+            <span className="text-secondary text-ink-300">
+              {t("No accounts match this status filter.")}
+            </span>
+            <Button size="sm" onClick={() => setFilter("all")}>
+              {t("Show all")}
+            </Button>
           </div>
         </article>
       ) : (
-        accounts.map((rec) => {
-          const a = rec.profile;
-          const currMajor = Math.round(a.daily_guardrail_minor / 100);
-          const valueStr = drafts[rec.id] ?? String(currMajor);
+        groupedPlatforms.map((platform) => {
+          const items = visibleItems.filter((m) => m.platform === platform);
+          const needsReconnect = connectionsByPlatform[platform]?.needs_reconnect === true;
           return (
-            <article key={rec.id} className="ads-card">
-              <div className="ads-row-between">
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <span className={`ads-dot ads-dot-${a.platform}`} />
-                    <strong style={{ color: "var(--color-ink-100)" }}>
-                      {a.platform === "meta" ? t("Meta Ads") : t("Google Ads")} · {a.display_name}
-                    </strong>
-                    <StatusPill tone={statusTone(a.status)}>{t("Active")}</StatusPill>
-                  </div>
-                  <div className="text-micro text-ink-500 num">
-                    {a.external_account_id}
-                    {a.login_customer_id ? ` · MCC ${a.login_customer_id}` : ""} · {a.currency} ·{" "}
-                    {a.timezone}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                {a.scopes_text.split(",").map((scope) => (
-                  <span key={scope.trim()} className="ads-scope-tag">
-                    {scope.trim()}
-                  </span>
-                ))}
-              </div>
-
-              <div className="ads-row-between" style={{ borderTop: "1px solid var(--color-ink-700)", paddingTop: "12px" }}>
-                <label htmlFor={`guard-${rec.id}`} className="text-label">
-                  {t("Daily budget guardrail")} ({a.currency})
-                </label>
+            <section key={platform} className="ads-platform-group">
+              <div className="ads-platform-head">
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <input
-                    id={`guard-${rec.id}`}
-                    type="number"
-                    min={100}
-                    step={100}
-                    disabled={!canWrite || savingId === rec.id}
-                    className="field num"
-                    style={{ width: "120px", height: "28px" }}
-                    value={valueStr}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [rec.id]: e.target.value }))}
-                  />
-                  {canWrite && (
-                    <Button
-                      size="sm"
-                      loading={savingId === rec.id}
-                      onClick={async () => {
-                        const major = Math.max(100, Math.round(Number(valueStr) || currMajor));
-                        setSavingId(rec.id);
-                        try {
-                          await onSaveGuardrail(rec, major * 100);
-                        } finally {
-                          setSavingId(null);
-                        }
-                      }}
-                    >
-                      {t("Save guardrail")}
-                    </Button>
-                  )}
+                  <span className={`ads-dot ads-dot-${platform}`} />
+                  <strong style={{ color: "var(--color-ink-100)", fontSize: "var(--text-secondary)" }}>
+                    {t(PLATFORM_LABELS[platform])}
+                  </strong>
+                  <span className="text-micro text-ink-500 num">({items.length})</span>
                 </div>
+                {needsReconnect && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <StatusPill tone="warn">{t("Connection expired")}</StatusPill>
+                    {canConnect && (
+                      <Button
+                        size="sm"
+                        loading={reconnecting === platform}
+                        onClick={async () => {
+                          setReconnecting(platform);
+                          setActionErr(null);
+                          try {
+                            await onConnectPlatform(platform);
+                          } catch (err) {
+                            setActionErr(
+                              err instanceof Error ? err.message : t("Could not start reconnect."),
+                            );
+                          } finally {
+                            setReconnecting(null);
+                          }
+                        }}
+                      >
+                        {t("Reconnect")}
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
-            </article>
+
+              <div className="ads-account-list">
+                {items.map((item) => {
+                  const isEditing = editingId === item.id;
+                  const isSaving = savingId === item.id;
+                  const isToggling = togglingId === item.id;
+                  return (
+                    <article
+                      key={item.id}
+                      className="ads-account-row"
+                      data-enabled={item.enabled ? "true" : "false"}
+                    >
+                      <div className="ads-account-info">
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <strong style={{ color: "var(--color-ink-100)" }}>{item.displayName}</strong>
+                          <StatusPill tone={item.enabled ? "ok" : "neutral"}>
+                            {item.enabled ? t("Enabled") : t("Disabled")}
+                          </StatusPill>
+                        </div>
+                        <div className="text-micro text-ink-500 num">
+                          {item.externalAccountId}
+                          {item.loginCustomerId ? ` · MCC ${item.loginCustomerId}` : ""} ·{" "}
+                          {item.currency} · {item.timezone}
+                        </div>
+                      </div>
+
+                      <div className="ads-account-actions">
+                        {item.record && item.enabled && (
+                          isEditing ? (
+                            <div className="ads-limit-editor">
+                              <input
+                                type="number"
+                                min={100}
+                                step={100}
+                                aria-label={t("Daily spend limit")}
+                                disabled={isSaving}
+                                className="field num"
+                                style={{ width: "100px", height: "26px" }}
+                                value={draftMajor}
+                                onChange={(e) => setDraftMajor(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Escape") setEditingId(null);
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    void commitLimitEdit(item);
+                                  }
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                loading={isSaving}
+                                onClick={() => void commitLimitEdit(item)}
+                              >
+                                {t("Save")}
+                              </Button>
+                              <Button size="sm" onClick={() => setEditingId(null)}>
+                                {t("Cancel")}
+                              </Button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="ads-limit-chip"
+                              disabled={!canWrite}
+                              title={t("Edit daily spend limit")}
+                              onClick={() => startLimitEdit(item)}
+                            >
+                              {fmtMoney(item.guardrailMinor, item.currency)}/d
+                            </button>
+                          )
+                        )}
+
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={item.enabled}
+                          aria-label={`${item.displayName} ${item.enabled ? t("Enabled") : t("Disabled")}`}
+                          className="ads-switch"
+                          disabled={!canWrite || isToggling}
+                          onClick={async () => {
+                            setTogglingId(item.id);
+                            setActionErr(null);
+                            try {
+                              await onToggleAccount(item, !item.enabled);
+                            } catch (err) {
+                              setActionErr(
+                                err instanceof Error
+                                  ? err.message
+                                  : t("Could not update account status."),
+                              );
+                            } finally {
+                              setTogglingId(null);
+                            }
+                          }}
+                        >
+                          <span className="ads-switch-thumb" />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
           );
         })
       )}
@@ -120,7 +340,7 @@ export function AccountsTab({
           <h3 className="text-cardtitle">{t("Workspace Media Storage (Images & Videos)")}</h3>
           <span className="text-micro text-ink-500">
             {t(
-              "Workspace Files (Wiki R2 blobs) stores binaries across apps; Ads Studio keeps scalar metadata pointers only.",
+              "Workspace Files stores media binaries across apps; Ads Studio keeps scalar metadata pointers only.",
             )}
           </span>
         </div>
@@ -129,50 +349,16 @@ export function AccountsTab({
             {
               key: "folder",
               term: t("Workspace Path"),
-              value: <span className="num">global/ads-studio/assets/ (wiki/&lt;ws&gt;/blobs/&lt;sha256&gt;)</span>,
+              value: <span className="num">global/ads-studio/assets/</span>,
             },
             {
               key: "caps",
               term: t("Size & Upload Cap"),
-              value: <span className="num">15 MiB hosted (WIKI_UPLOAD_MAX) · 100 MB native (MAX_UPLOAD_BYTES)</span>,
-            },
-            {
-              key: "storage",
-              term: "app-storage/v1",
-              value: "Scalar metadata + wiki_path + sha256 pointers in creative_assets (zero binary blobs)",
+              value: <span className="num">15 MiB hosted · 100 MB native</span>,
             },
           ]}
         />
       </article>
-
-      <details className="ads-card">
-        <summary
-          className="text-secondary"
-          style={{ cursor: "pointer", fontWeight: 600, color: "var(--color-ink-100)" }}
-        >
-          {t("Platform contract & @cadence/app-kit@0.8.0 (6/6 ready caps)")}
-        </summary>
-        <div style={{ display: "grid", gap: "10px", marginTop: "10px" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-            {[
-              "screen.v2",
-              "screen-records.v1",
-              "screen-surfaces.v1",
-              "screen-canvas.v1",
-              "screen-route-params.v1",
-              "screen-locale.v1",
-            ].map((cap) => (
-              <span key={cap} className="ads-scope-tag">
-                {cap}
-              </span>
-            ))}
-          </div>
-          <div className="text-micro text-ink-400 num">
-            Declared views in screens.json: overview (range, platform) · campaigns / campaign_audit
-            (range, platform, status, q) · campaign (id) · proposals · creatives · accounts
-          </div>
-        </div>
-      </details>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 ---
 app: ads-studio
 title: Ads Studio
-version: '0.5.0'
+version: '0.6.0'
 summary: Cross-channel Meta Ads and Google Ads console for spend guardrails, owner-approved changes, and Workspace media pointers.
 needs:
   connections: []
@@ -14,11 +14,11 @@ listing:
   icon: assets/ads-studio.svg
   publisher:
     name: Cadence
-  about: Ads Studio brings Meta Ads and Google Ads campaigns into one Cadence workspace. Authorize and pin Meta Ads or Google Ads accounts in Settings Connections, import them directly in Add Ad Account via owner-only connections.assets discovery, track daily spend guardrails, sync live 7-day spend and split conversions via Composio connectors, spot CPA outliers, review staged proposals before they apply, check CJK half-width Google RSA and Meta ad copy rules, and deliver creatives via signed Workspace Files URLs or YouTube video IDs.
+  about: Ads Studio brings Meta Ads and Google Ads campaigns into one Cadence workspace. Connect ad platforms directly from the Accounts tab, toggle enabled or disabled accounts, track daily spend limits, sync live 7-day spend and split conversions, spot CPA outliers, review staged proposals before they apply, check CJK half-width Google RSA and Meta ad copy rules, and deliver creatives via signed Workspace Files URLs or YouTube video IDs.
   can:
-    - Import authorized Meta and Google Ads accounts directly from Composio OAuth connections
+    - Connect Meta Ads and Google Ads platforms directly and toggle enabled or disabled accounts
     - Track Meta Ads and Google Ads campaigns with separate conversion reporting
-    - Enforce daily spend guardrails and highlight high-CPA outliers
+    - Enforce daily spend limits and highlight high-CPA outliers
     - Stage campaign, budget, and status changes for explicit owner approval
     - Store image and video pointers linked to Workspace Files
   screenshots: []
@@ -35,6 +35,12 @@ listing:
       tagline: 統一檢視 Meta 與 Google 廣告支出並以負責人審批控管變更
       summary: 在同一工作區追蹤 Meta 與 Google 廣告活動、設定每日支出護欄、審批預算與狀態調整，並管理工作區素材指標。
   changes:
+    - version: '0.6.0'
+      notes:
+        - Simplify Accounts with platform-grouped enabled or disabled toggles and inline daily spend limit editing
+        - Connect Meta Ads and Google Ads directly from the Accounts drawer without leaving to workspace Settings
+        - Prompt inline Reconnect when an existing platform connection expires
+      keeps: Existing ad accounts, campaigns, staged proposals, creative pointers, and audit events stay unchanged
     - version: '0.5.0'
       notes:
         - Pick authorized Meta and Google Ads accounts directly from Composio OAuth connections

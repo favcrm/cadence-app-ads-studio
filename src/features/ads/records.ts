@@ -34,7 +34,25 @@ export interface ConnectedAccountSource {
 export interface ConnectedAssetsReply {
   toolkit: "metaads" | "googleads";
   connected: boolean;
+  needs_reconnect: boolean;
   connections: ConnectedAccountSource[];
+}
+
+export interface MergedPlatformAccount {
+  id: string;
+  key: string;
+  platform: Platform;
+  displayName: string;
+  externalAccountId: string;
+  loginCustomerId: string | null;
+  currency: string;
+  timezone: string;
+  status: "active" | "inactive";
+  enabled: boolean;
+  guardrailMinor: number;
+  record: StoredRecord<AdAccountProfile> | null;
+  connectedAsset: SelectableConnectedAsset | null;
+  needsReconnect: boolean;
 }
 
 export interface SelectableConnectedAsset {
@@ -134,6 +152,7 @@ export function parseConnectedAssetsReply(
   return {
     toolkit: expectedToolkit,
     connected: body.connected,
+    needs_reconnect: body.needs_reconnect === true,
     connections,
   };
 }
@@ -190,6 +209,82 @@ export async function loadConnectedAdAssets(
   const toolkit = platform === "meta" ? "metaads" : "googleads";
   const raw = await serviceCall(scope, "connections.assets", { toolkit }, true);
   return parseConnectedAssetsReply(raw, platform);
+}
+
+export async function connectAdPlatform(
+  scope: DisplayScope,
+  platform: Platform,
+  section = "accounts",
+): Promise<{ started: boolean }> {
+  const toolkit = platform === "meta" ? "metaads" : "googleads";
+  const raw = await serviceCall(scope, "connections.connect", { toolkit, section }, false);
+  const body = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+  return { started: body?.started === true };
+}
+
+/** Merge saved workspace ad accounts with discovered connected assets per platform. */
+export function mergePlatformAccounts(
+  savedAccounts: readonly StoredRecord<AdAccountProfile>[],
+  connectionsByPlatform: Partial<Record<Platform, ConnectedAssetsReply>>,
+): MergedPlatformAccount[] {
+  const out: MergedPlatformAccount[] = [];
+  for (const platform of ["meta", "google"] as const) {
+    const reply = connectionsByPlatform[platform] ?? null;
+    const needsReconnect = reply?.needs_reconnect === true;
+    const discovered = reply ? flattenSelectableConnectedAssets(reply, platform, savedAccounts) : [];
+    const byNormId = new Map<string, SelectableConnectedAsset>();
+    for (const opt of discovered) {
+      byNormId.set(opt.normalizedExternalId.toLowerCase(), opt);
+    }
+
+    const platformSaved = savedAccounts.filter((acc) => acc.profile.platform === platform);
+    const seenIds = new Set<string>();
+    for (const rec of platformSaved) {
+      const norm = normalizeExternalAccountId(platform, rec.profile.external_account_id).toLowerCase();
+      seenIds.add(norm);
+      const match = byNormId.get(norm) ?? null;
+      const status = rec.profile.status === "inactive" ? "inactive" : "active";
+      out.push({
+        id: rec.id,
+        key: rec.profile.account_key,
+        platform,
+        displayName: rec.profile.display_name,
+        externalAccountId: rec.profile.external_account_id,
+        loginCustomerId: rec.profile.login_customer_id,
+        currency: rec.profile.currency,
+        timezone: rec.profile.timezone,
+        status,
+        enabled: status === "active",
+        guardrailMinor: rec.profile.daily_guardrail_minor,
+        record: rec,
+        connectedAsset: match,
+        needsReconnect,
+      });
+    }
+
+    for (const opt of discovered) {
+      const norm = opt.normalizedExternalId.toLowerCase();
+      if (seenIds.has(norm)) continue;
+      seenIds.add(norm);
+      out.push({
+        id: `conn:${platform}:${opt.connectionId}:${opt.asset.value}`,
+        key: `${platform}_${norm.replace(/[^a-z0-9]+/g, "_")}`,
+        platform,
+        displayName: opt.derivedDisplayName,
+        externalAccountId: opt.normalizedExternalId,
+        loginCustomerId: null,
+        currency: opt.asset.currency?.trim().toUpperCase() || "HKD",
+        timezone: opt.asset.timezone?.trim() || "Asia/Hong_Kong",
+        status: "inactive",
+        enabled: false,
+        guardrailMinor: 150000,
+        record: null,
+        connectedAsset: opt,
+        needsReconnect,
+      });
+    }
+  }
+  return out;
 }
 
 export interface WorkspaceDataset {
@@ -279,6 +374,21 @@ export async function saveAccountGuardrail(
     record_id: account.id,
     expected_revision: account.revision,
     profile: { ...account.profile, daily_guardrail_minor: dailyGuardrailMinor },
+  });
+  notifyWritten();
+}
+
+export async function setAdAccountEnabled(
+  scope: DisplayScope,
+  account: StoredRecord<AdAccountProfile>,
+  enabled: boolean,
+): Promise<void> {
+  const nextStatus = enabled ? "active" : "inactive";
+  await serviceCall(scope, "records.update", {
+    table: "ad_accounts",
+    record_id: account.id,
+    expected_revision: account.revision,
+    profile: { ...account.profile, status: nextStatus },
   });
   notifyWritten();
 }

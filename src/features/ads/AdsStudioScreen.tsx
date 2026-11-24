@@ -2,11 +2,12 @@ import { Button, ErrorNotice, Loading } from "@cadence/screen-ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { patchRoute } from "../../bridge/route";
 import { scopeError, useCanvasReadOnly, useScope } from "../../bridge/scope";
-import type {
-  AdProposalProfile,
-  CampaignStatus,
-  Platform,
-  StoredRecord,
+import {
+  validateAccountInput,
+  type AdProposalProfile,
+  type CampaignStatus,
+  type Platform,
+  type StoredRecord,
 } from "../../domain/ads";
 import { AccountsTab } from "./AccountsTab";
 import { ApprovalModal } from "./ApprovalModal";
@@ -17,6 +18,7 @@ import { AdsLocaleProvider, useLocale } from "./locale";
 import { OverviewTab } from "./OverviewTab";
 import { ProposalsTab } from "./ProposalsTab";
 import {
+  connectAdPlatform,
   createAdAccount,
   decideProposal,
   loadConnectedAdAssets,
@@ -24,7 +26,9 @@ import {
   registerAssetPointer,
   saveAccountGuardrail,
   seedStarterWorkspace,
+  setAdAccountEnabled,
   stageProposal,
+  type ConnectedAssetsReply,
   type WorkspaceDataset,
 } from "./records";
 import "./ads-studio.css";
@@ -66,6 +70,11 @@ function Mounted() {
 
   const [drawer, setDrawer] = useState<ActiveDrawer | null>(null);
   const [modalProposal, setModalProposal] = useState<StoredRecord<AdProposalProfile> | null>(null);
+  const [connectionsByPlatform, setConnectionsByPlatform] = useState<
+    Partial<Record<Platform, ConnectedAssetsReply>>
+  >({});
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const openedRouteTarget = useRef<string | null>(null);
 
   useEffect(() => {
@@ -131,13 +140,28 @@ function Mounted() {
     }
   }, [data, routeSection, routeTargetId]);
 
-  const loadConnectedAssetsForPlatform = useCallback(
-    (platform: Platform) => {
-      if (!snapshot) return Promise.reject(new Error("Workspace scope is unavailable."));
-      return loadConnectedAdAssets(snapshot.scope, platform);
-    },
-    [snapshot?.scope.installId, snapshot?.scope.digest],
-  );
+  const loadAllConnections = useCallback(async () => {
+    if (!snapshot || canvas || !snapshot.actions.includes("connections.assets")) return;
+    setLoadingConnections(true);
+    setConnectionError(null);
+    const [metaRes, googleRes] = await Promise.allSettled([
+      loadConnectedAdAssets(snapshot.scope, "meta"),
+      loadConnectedAdAssets(snapshot.scope, "google"),
+    ]);
+    const next: Partial<Record<Platform, ConnectedAssetsReply>> = {};
+    const errs: string[] = [];
+    if (metaRes.status === "fulfilled") next.meta = metaRes.value;
+    else errs.push(metaRes.reason instanceof Error ? metaRes.reason.message : "Meta Ads");
+    if (googleRes.status === "fulfilled") next.google = googleRes.value;
+    else errs.push(googleRes.reason instanceof Error ? googleRes.reason.message : "Google Ads");
+    setConnectionsByPlatform(next);
+    if (errs.length > 0) setConnectionError(errs.join(" · "));
+    setLoadingConnections(false);
+  }, [snapshot?.scope.installId, snapshot?.scope.digest, canvas, snapshot?.actions]);
+
+  useEffect(() => {
+    if (snapshot) void loadAllConnections();
+  }, [loadAllConnections, snapshot]);
 
   if (!snapshot) {
     const lost = scopeError();
@@ -157,7 +181,7 @@ function Mounted() {
     actions.includes("records.create") &&
     actions.includes("records.update") &&
     actions.includes("records.batch");
-  const canReadConnections = !canvas && actions.includes("connections.assets");
+  const canConnect = !canvas && actions.includes("connections.connect");
 
   const activeParams = Object.entries(route.params ?? {});
 
@@ -277,8 +301,36 @@ function Mounted() {
           {route.section === "accounts" && (
             <AccountsTab
               accounts={data.accounts}
+              connectionsByPlatform={connectionsByPlatform}
+              loadingConnections={loadingConnections}
+              connectionError={connectionError}
               canWrite={canWrite}
+              canConnect={canConnect}
+              onRefresh={async () => {
+                await Promise.all([refresh(), loadAllConnections()]);
+              }}
               onAddAccount={() => setDrawer({ kind: "new_account" })}
+              onConnectPlatform={async (platform) => {
+                await connectAdPlatform(scope, platform, "accounts");
+              }}
+              onToggleAccount={async (item, nextEnabled) => {
+                if (item.record) {
+                  await setAdAccountEnabled(scope, item.record, nextEnabled);
+                } else if (nextEnabled) {
+                  const validated = validateAccountInput({
+                    platform: item.platform,
+                    external_account_id: item.externalAccountId,
+                    login_customer_id: item.loginCustomerId,
+                    display_name: item.displayName,
+                    currency: item.currency,
+                    timezone: item.timezone,
+                    daily_guardrail_minor: item.guardrailMinor,
+                  });
+                  if (!validated.ok) throw new Error(validated.error);
+                  await createAdAccount(scope, validated.value);
+                }
+                await refresh();
+              }}
               onSaveGuardrail={async (acct, dailyMinor) => {
                 await saveAccountGuardrail(scope, acct, dailyMinor);
                 await refresh();
@@ -292,8 +344,10 @@ function Mounted() {
               accounts={data.accounts}
               auditEvents={data.auditEvents}
               canWrite={canWrite}
-              canReadConnections={canReadConnections}
-              onLoadConnectedAssets={loadConnectedAssetsForPlatform}
+              canConnect={canConnect}
+              onConnectPlatform={async (platform) => {
+                await connectAdPlatform(scope, platform, "accounts");
+              }}
               onClose={() => setDrawer(null)}
               onStageProposal={async (input) => {
                 await stageProposal(scope, input);

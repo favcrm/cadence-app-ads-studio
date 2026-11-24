@@ -1,5 +1,5 @@
-import { Button, DataTable, Detail, DrawerShell, Field, Loading, Notice, Select } from "@cadence/screen-ui";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Button, DataTable, Detail, DrawerShell, Field, Select } from "@cadence/screen-ui";
+import { useMemo, useState, type FormEvent } from "react";
 import {
   assetCapStatus,
   formatBytesCompact,
@@ -19,12 +19,7 @@ import {
 import { fmtMoney, parseMajorToMinor } from "../../domain/money";
 import { AssetGraphic } from "./CreativesTab";
 import { useLocale } from "./locale";
-import {
-  flattenSelectableConnectedAssets,
-  normalizeExternalAccountId,
-  pickPreferredConnectedAsset,
-  type ConnectedAssetsReply,
-} from "./records";
+import { normalizeExternalAccountId } from "./records";
 import { StatusPill, statusTone } from "./StatusPill";
 
 export type ActiveDrawer =
@@ -39,8 +34,8 @@ export function DetailDrawer({
   accounts,
   auditEvents,
   canWrite,
-  canReadConnections,
-  onLoadConnectedAssets,
+  canConnect,
+  onConnectPlatform,
   onClose,
   onStageProposal,
   onCreateAccount,
@@ -50,8 +45,8 @@ export function DetailDrawer({
   accounts: readonly StoredRecord<AdAccountProfile>[];
   auditEvents: readonly StoredRecord<AuditEventProfile>[];
   canWrite: boolean;
-  canReadConnections: boolean;
-  onLoadConnectedAssets: (platform: Platform) => Promise<ConnectedAssetsReply>;
+  canConnect: boolean;
+  onConnectPlatform: (platform: Platform) => Promise<void>;
   onClose: () => void;
   onStageProposal: (input: {
     account: AdAccountProfile;
@@ -149,8 +144,8 @@ export function DetailDrawer({
     return (
       <NewAccountDrawer
         existingAccounts={accounts}
-        canReadConnections={canReadConnections}
-        onLoadConnectedAssets={onLoadConnectedAssets}
+        canConnect={canConnect}
+        onConnectPlatform={onConnectPlatform}
         busy={busy}
         onClose={onClose}
         onSubmit={async (account) => {
@@ -575,28 +570,64 @@ function NewCampaignDrawer({
   );
 }
 
+interface PlatformDirectoryEntry {
+  id: Platform | "tiktok" | "linkedin";
+  label: string;
+  subtitle: string;
+  dotClass: string;
+  available: boolean;
+}
+
+const PLATFORM_DIRECTORY: readonly PlatformDirectoryEntry[] = [
+  {
+    id: "meta",
+    label: "Meta Ads",
+    subtitle: "Facebook & Instagram ad accounts",
+    dotClass: "ads-dot-meta",
+    available: true,
+  },
+  {
+    id: "google",
+    label: "Google Ads",
+    subtitle: "Search, YouTube & Performance Max accounts",
+    dotClass: "ads-dot-google",
+    available: true,
+  },
+  {
+    id: "tiktok",
+    label: "TikTok Ads",
+    subtitle: "For Business ad accounts",
+    dotClass: "ads-dot-tiktok",
+    available: false,
+  },
+  {
+    id: "linkedin",
+    label: "LinkedIn Ads",
+    subtitle: "Campaign Manager accounts",
+    dotClass: "ads-dot-linkedin",
+    available: false,
+  },
+];
+
 function NewAccountDrawer({
   existingAccounts,
-  canReadConnections,
-  onLoadConnectedAssets,
+  canConnect,
+  onConnectPlatform,
   busy,
   onClose,
   onSubmit,
 }: {
   existingAccounts: readonly StoredRecord<AdAccountProfile>[];
-  canReadConnections: boolean;
-  onLoadConnectedAssets: (platform: Platform) => Promise<ConnectedAssetsReply>;
+  canConnect: boolean;
+  onConnectPlatform: (platform: Platform) => Promise<void>;
   busy: boolean;
   onClose: () => void;
   onSubmit: (account: AdAccountProfile) => Promise<void>;
 }) {
   const { t } = useLocale();
+  const [manualMode, setManualMode] = useState(!canConnect);
+  const [connecting, setConnecting] = useState<Platform | null>(null);
   const [platform, setPlatform] = useState<Platform>("meta");
-  const [manualMode, setManualMode] = useState(!canReadConnections);
-  const [loadingConn, setLoadingConn] = useState(canReadConnections);
-  const [connReply, setConnReply] = useState<ConnectedAssetsReply | null>(null);
-  const [connErr, setConnErr] = useState<string | null>(null);
-  const [selectedKey, setSelectedKey] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [externalId, setExternalId] = useState("");
   const [mccId, setMccId] = useState("");
@@ -604,86 +635,6 @@ function NewAccountDrawer({
   const [timezone, setTimezone] = useState("Asia/Hong_Kong");
   const [guardrailStr, setGuardrailStr] = useState("1500");
   const [error, setError] = useState<string | null>(null);
-  const fetchSeq = useRef(0);
-  const existingAccountsRef = useRef(existingAccounts);
-  existingAccountsRef.current = existingAccounts;
-  const onLoadRef = useRef(onLoadConnectedAssets);
-  onLoadRef.current = onLoadConnectedAssets;
-
-  const selectableAssets = useMemo(() => {
-    if (!connReply) return [];
-    return flattenSelectableConnectedAssets(connReply, platform, existingAccounts);
-  }, [connReply, platform, existingAccounts]);
-
-  const optionKeyFor = (connId: string, value: string) => `${connId}::${value}`;
-  const activeOption = useMemo(
-    () => selectableAssets.find((opt) => optionKeyFor(opt.connectionId, opt.asset.value) === selectedKey) ?? null,
-    [selectableAssets, selectedKey],
-  );
-
-  const applyConnectedOption = useCallback((opt: (typeof selectableAssets)[number] | null) => {
-    if (!opt) {
-      setSelectedKey("");
-      setExternalId("");
-      setDisplayName("");
-      return;
-    }
-    setSelectedKey(optionKeyFor(opt.connectionId, opt.asset.value));
-    setExternalId(opt.normalizedExternalId);
-    setDisplayName(opt.derivedDisplayName);
-    setCurrency(opt.asset.currency?.trim().toUpperCase() || "HKD");
-    setTimezone(opt.asset.timezone?.trim() || "Asia/Hong_Kong");
-    setError(null);
-  }, []);
-
-  const fetchConnections = useCallback(
-    async (targetPlatform: Platform) => {
-      if (!canReadConnections) return;
-      const reqId = ++fetchSeq.current;
-      setLoadingConn(true);
-      setConnErr(null);
-      setConnReply(null);
-      setSelectedKey("");
-      setError(null);
-      try {
-        const reply = await onLoadRef.current(targetPlatform);
-        if (fetchSeq.current !== reqId) return;
-        setConnReply(reply);
-        const options = flattenSelectableConnectedAssets(
-          reply,
-          targetPlatform,
-          existingAccountsRef.current,
-        );
-        const preferred = pickPreferredConnectedAsset(options);
-        if (preferred) {
-          setSelectedKey(optionKeyFor(preferred.connectionId, preferred.asset.value));
-          setExternalId(preferred.normalizedExternalId);
-          setDisplayName(preferred.derivedDisplayName);
-          setCurrency(preferred.asset.currency?.trim().toUpperCase() || "HKD");
-          setTimezone(preferred.asset.timezone?.trim() || "Asia/Hong_Kong");
-        } else {
-          setExternalId("");
-          setDisplayName("");
-        }
-      } catch (err) {
-        if (fetchSeq.current !== reqId) return;
-        setConnErr(
-          err instanceof Error
-            ? err.message
-            : t("Could not read connected ad accounts from host Connections."),
-        );
-      } finally {
-        if (fetchSeq.current === reqId) setLoadingConn(false);
-      }
-    },
-    [canReadConnections, t],
-  );
-
-  useEffect(() => {
-    if (canReadConnections && !manualMode) {
-      void fetchConnections(platform);
-    }
-  }, [canReadConnections, manualMode, platform, fetchConnections]);
 
   const normalizedEnteredId = normalizeExternalAccountId(platform, externalId);
   const duplicateManual = useMemo(
@@ -697,18 +648,10 @@ function NewAccountDrawer({
       ),
     [existingAccounts, platform, normalizedEnteredId],
   );
-  const selectedDuplicate = manualMode ? duplicateManual : Boolean(activeOption?.alreadyAdded);
 
-  const connectionErrors = useMemo(
-    () => (connReply?.connections ?? []).filter((c) => c.error?.message),
-    [connReply],
-  );
-  const pickerMode = canReadConnections && !manualMode;
-  const hasSelectablePicker = pickerMode && !loadingConn && selectableAssets.length > 0;
-
-  const handleSubmit = async (e: FormEvent) => {
+  const handleManualSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (selectedDuplicate) {
+    if (duplicateManual) {
       setError(t("This account is already tracked in Ads Studio."));
       return;
     }
@@ -730,51 +673,25 @@ function NewAccountDrawer({
     await onSubmit(res.value);
   };
 
-  const toggleModeButton = canReadConnections && (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-      <Button
-        size="sm"
-        onClick={() => {
-          setError(null);
-          if (manualMode) {
-            setManualMode(false);
-          } else {
-            setManualMode(true);
-            setExternalId("");
-            setDisplayName("");
-          }
-        }}
-      >
-        {manualMode ? t("Pick from Composio OAuth") : t("Enter manually instead")}
-      </Button>
-      {pickerMode && (
-        <Button size="sm" loading={loadingConn} onClick={() => void fetchConnections(platform)}>
-          {t("Refresh")}
-        </Button>
-      )}
-    </div>
-  );
-
   return (
     <DrawerShell
       kind={t("Ad Accounts")}
-      label={t("+ Add ad account")}
-      title={t("+ Add ad account")}
+      label={t("Connect ad account")}
+      title={manualMode ? t("Enter ID manually") : t("Connect ad account")}
       onClose={onClose}
       tabs={[
         {
           id: "account",
-          label: t("Account Details"),
-          panel: (
-            <form className="ads-form-grid" onSubmit={handleSubmit}>
+          label: manualMode ? t("Account Details") : t("Choose platform"),
+          panel: manualMode ? (
+            <form className="ads-form-grid" onSubmit={handleManualSubmit}>
               <Field label={t("Platform")}>
                 {() => (
                   <Select
                     aria-label={t("Platform")}
                     value={platform}
                     onChange={(v) => {
-                      const next = v as Platform;
-                      setPlatform(next);
+                      setPlatform(v as Platform);
                       setMccId("");
                       setError(null);
                     }}
@@ -785,195 +702,93 @@ function NewAccountDrawer({
                   />
                 )}
               </Field>
-
-              {toggleModeButton}
-
-              {pickerMode && loadingConn && (
-                <Loading>{t("Loading Composio OAuth connections…")}</Loading>
-              )}
-
-              {pickerMode && !loadingConn && connErr && (
-                <Notice state="error" onRetry={() => void fetchConnections(platform)}>
-                  <div style={{ display: "grid", gap: "4px" }}>
-                    <strong>{t("Could not reach Connections")}</strong>
-                    <span className="text-micro">{connErr}</span>
-                  </div>
-                </Notice>
-              )}
-
-              {pickerMode && !loadingConn && !connErr && connReply && !connReply.connected && (
-                <Notice state="disconnected">
-                  <div style={{ display: "grid", gap: "4px" }}>
-                    <strong>{t("Connect in Settings → Connections")}</strong>
-                    <span className="text-micro">
-                      {platform === "meta"
-                        ? t(
-                            "Meta Ads is not connected via Composio OAuth yet. Open Settings → Connections in the sidebar to authorize and pin an account, then click Refresh.",
-                          )
-                        : t(
-                            "Google Ads is not connected via Composio OAuth yet. Open Settings → Connections in the sidebar to authorize and pin an account, then click Refresh.",
-                          )}
-                    </span>
-                  </div>
-                </Notice>
-              )}
-
-              {pickerMode &&
-                !loadingConn &&
-                !connErr &&
-                connReply &&
-                connReply.connected &&
-                selectableAssets.length === 0 && (
-                  <Notice state="empty">
-                    <div style={{ display: "grid", gap: "4px" }}>
-                      <strong>{t("No authorized ad accounts returned")}</strong>
-                      <span className="text-micro">
-                        {connectionErrors.length > 0
-                          ? `${t("Connected accounts returned an error:")} ${connectionErrors.map((c) => c.error?.message).filter(Boolean).join("; ")}`
-                          : t(
-                              "The connected OAuth profile did not return any selectable ad accounts. Check permissions in Settings → Connections, then click Refresh, or enter account details manually.",
-                            )}
-                      </span>
-                    </div>
-                  </Notice>
+              <Field label={t("Display Name")}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    placeholder="e.g. Acme Studio — Performance"
+                    className="field"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                  />
                 )}
-
-              {hasSelectablePicker && (
-                <>
-                  <div className="ads-inset">
-                    <div className="ads-row-between">
-                      <span className="text-micro text-ink-300">{t("Connected via Composio OAuth")}</span>
-                      {activeOption?.isPinned && <StatusPill tone="ok">{t("Pinned")}</StatusPill>}
-                    </div>
-                    {activeOption?.connectionAccount && (
-                      <span className="text-micro text-ink-500 num">
-                        {activeOption.connectionAccount}
-                      </span>
-                    )}
-                  </div>
-
-                  <Field label={t("Composio Ad Account")}>
-                    {() => (
-                      <Select
-                        aria-label={t("Composio Ad Account")}
-                        value={selectedKey}
-                        onChange={(key) => {
-                          const found =
-                            selectableAssets.find(
-                              (opt) => optionKeyFor(opt.connectionId, opt.asset.value) === key,
-                            ) ?? null;
-                          applyConnectedOption(found);
-                        }}
-                        options={selectableAssets.map((opt) => ({
-                          value: optionKeyFor(opt.connectionId, opt.asset.value),
-                          label: opt.asset.label,
-                          hint: [opt.normalizedExternalId, opt.asset.currency, opt.asset.timezone]
-                            .filter(Boolean)
-                            .join(" · "),
-                          badge: opt.alreadyAdded
-                            ? t("Already added")
-                            : opt.isPinned
-                              ? t("Pinned")
-                              : undefined,
-                        }))}
-                      />
-                    )}
-                  </Field>
-                </>
-              )}
-
-              {(manualMode || !canReadConnections || hasSelectablePicker) && (
-                <>
-                  <Field label={t("Display Name")}>
-                    {({ id, ...ctrl }) => (
-                      <input
-                        id={id}
-                        {...ctrl}
-                        required
-                        placeholder="e.g. Acme Studio — Performance"
-                        className="field"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                      />
-                    )}
-                  </Field>
-                  <Field
-                    label={t("External Account ID")}
-                    hint={platform === "meta" ? "act_1234567890" : "123-456-7890"}
-                  >
-                    {({ id, ...ctrl }) => (
-                      <input
-                        id={id}
-                        {...ctrl}
-                        required
-                        readOnly={hasSelectablePicker}
-                        placeholder={platform === "meta" ? "act_1234567890" : "123-456-7890"}
-                        className="field num"
-                        value={externalId}
-                        onChange={(e) => setExternalId(e.target.value)}
-                      />
-                    )}
-                  </Field>
-                  {platform === "google" && (
-                    <Field label={t("Google MCC ID (optional)")} hint="123-456-7890">
-                      {({ id, ...ctrl }) => (
-                        <input
-                          id={id}
-                          {...ctrl}
-                          placeholder="123-456-7890"
-                          className="field num"
-                          value={mccId}
-                          onChange={(e) => setMccId(e.target.value)}
-                        />
-                      )}
-                    </Field>
+              </Field>
+              <Field
+                label={t("External Account ID")}
+                hint={platform === "meta" ? "act_1234567890" : "123-456-7890"}
+              >
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    placeholder={platform === "meta" ? "act_1234567890" : "123-456-7890"}
+                    className="field num"
+                    value={externalId}
+                    onChange={(e) => setExternalId(e.target.value)}
+                  />
+                )}
+              </Field>
+              {platform === "google" && (
+                <Field label={t("Google MCC ID (optional)")} hint="123-456-7890">
+                  {({ id, ...ctrl }) => (
+                    <input
+                      id={id}
+                      {...ctrl}
+                      placeholder="123-456-7890"
+                      className="field num"
+                      value={mccId}
+                      onChange={(e) => setMccId(e.target.value)}
+                    />
                   )}
-                  <Field label={t("Currency")}>
-                    {({ id, ...ctrl }) => (
-                      <input
-                        id={id}
-                        {...ctrl}
-                        required
-                        maxLength={3}
-                        placeholder="HKD"
-                        className="field num"
-                        value={currency}
-                        onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                      />
-                    )}
-                  </Field>
-                  <Field label={t("Timezone")}>
-                    {({ id, ...ctrl }) => (
-                      <input
-                        id={id}
-                        {...ctrl}
-                        required
-                        placeholder="Asia/Hong_Kong"
-                        className="field num"
-                        value={timezone}
-                        onChange={(e) => setTimezone(e.target.value)}
-                      />
-                    )}
-                  </Field>
-                  <Field label={`${t("Daily budget guardrail")} (${currency || "HKD"})`}>
-                    {({ id, ...ctrl }) => (
-                      <input
-                        id={id}
-                        {...ctrl}
-                        type="number"
-                        min={100}
-                        step="any"
-                        required
-                        className="field num"
-                        value={guardrailStr}
-                        onChange={(e) => setGuardrailStr(e.target.value)}
-                      />
-                    )}
-                  </Field>
-                </>
+                </Field>
               )}
+              <Field label={t("Currency")}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    maxLength={3}
+                    placeholder="HKD"
+                    className="field num"
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+                  />
+                )}
+              </Field>
+              <Field label={t("Timezone")}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    required
+                    placeholder="Asia/Hong_Kong"
+                    className="field num"
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field label={`${t("Daily spend limit")} (${currency || "HKD"})`}>
+                {({ id, ...ctrl }) => (
+                  <input
+                    id={id}
+                    {...ctrl}
+                    type="number"
+                    min={100}
+                    step="any"
+                    required
+                    className="field num"
+                    value={guardrailStr}
+                    onChange={(e) => setGuardrailStr(e.target.value)}
+                  />
+                )}
+              </Field>
 
-              {selectedDuplicate && (
+              {duplicateManual && (
                 <p role="status" className="text-micro" style={{ color: "var(--color-warn)", margin: 0 }}>
                   {t("This account is already tracked in Ads Studio.")}
                 </p>
@@ -985,20 +800,105 @@ function NewAccountDrawer({
                 </p>
               )}
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                <Button onClick={onClose}>{t("Cancel")}</Button>
-                {(manualMode || !canReadConnections || hasSelectablePicker) && (
+              <div className="ads-drawer-footer-link">
+                {canConnect ? (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setManualMode(false);
+                      setError(null);
+                    }}
+                  >
+                    {t("Back to platforms")}
+                  </Button>
+                ) : (
+                  <span />
+                )}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <Button onClick={onClose}>{t("Cancel")}</Button>
                   <Button
                     type="submit"
                     variant="primary"
                     loading={busy}
-                    disabled={selectedDuplicate}
+                    disabled={duplicateManual}
                   >
                     {t("Save")}
                   </Button>
-                )}
+                </div>
               </div>
             </form>
+          ) : (
+            <div className="ads-form-grid">
+              <p className="text-secondary text-ink-400" style={{ margin: 0 }}>
+                {t("Select an ad platform to connect accounts to this workspace.")}
+              </p>
+
+              <div className="ads-platform-dir">
+                {PLATFORM_DIRECTORY.map((entry) => {
+                  const isBusy = connecting === entry.id;
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      className="ads-platform-option"
+                      disabled={!entry.available || connecting !== null}
+                      onClick={async () => {
+                        if (!entry.available || (entry.id !== "meta" && entry.id !== "google")) {
+                          return;
+                        }
+                        setConnecting(entry.id);
+                        setError(null);
+                        try {
+                          await onConnectPlatform(entry.id);
+                        } catch (err) {
+                          setError(
+                            err instanceof Error
+                              ? err.message
+                              : t("Could not start account connection."),
+                          );
+                          setConnecting(null);
+                        }
+                      }}
+                    >
+                      <div style={{ display: "grid", gap: "2px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span className={`ads-dot ${entry.dotClass}`} />
+                          <strong>{t(entry.label)}</strong>
+                        </div>
+                        <span className="text-micro text-ink-400">{t(entry.subtitle)}</span>
+                      </div>
+                      {entry.available ? (
+                        <StatusPill tone="accent">
+                          {isBusy ? t("Connecting…") : t("Connect")}
+                        </StatusPill>
+                      ) : (
+                        <StatusPill tone="neutral">{t("Coming soon")}</StatusPill>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {error && (
+                <p role="alert" style={{ color: "var(--danger, #b91c1c)", fontSize: "13px", margin: 0 }}>
+                  {error}
+                </p>
+              )}
+
+              <div className="ads-drawer-footer-link">
+                <button
+                  type="button"
+                  className="ads-chip"
+                  onClick={() => {
+                    setManualMode(true);
+                    setError(null);
+                  }}
+                >
+                  {t("Enter ID manually")}
+                </button>
+                <Button onClick={onClose}>{t("Close")}</Button>
+              </div>
+            </div>
           ),
         },
       ]}
