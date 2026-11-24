@@ -13,7 +13,6 @@ import {
   type CreativeAssetProfile,
   type MediaKind,
   type Platform,
-  type ProposalActionType,
   type StoredRecord,
 } from "../../domain/ads";
 import { fmtMoney, parseMajorToMinor } from "../../domain/money";
@@ -24,7 +23,6 @@ import { StatusPill, statusTone } from "./StatusPill";
 
 export type ActiveDrawer =
   | { kind: "campaign"; record: StoredRecord<AdCampaignProfile> }
-  | { kind: "new_campaign" }
   | { kind: "new_account" }
   | { kind: "asset"; record: StoredRecord<CreativeAssetProfile> }
   | { kind: "new_asset" };
@@ -33,29 +31,18 @@ export function DetailDrawer({
   drawer,
   accounts,
   auditEvents,
-  canWrite,
   canConnect,
   onConnectPlatform,
   onClose,
-  onStageProposal,
   onCreateAccount,
   onCreateAsset,
 }: {
   drawer: ActiveDrawer;
   accounts: readonly StoredRecord<AdAccountProfile>[];
   auditEvents: readonly StoredRecord<AuditEventProfile>[];
-  canWrite: boolean;
   canConnect: boolean;
   onConnectPlatform: (platform: Platform) => Promise<void>;
   onClose: () => void;
-  onStageProposal: (input: {
-    account: AdAccountProfile;
-    campaign: AdCampaignProfile | null;
-    campaignName: string;
-    actionType: ProposalActionType;
-    newBudgetMinor: number | null;
-    rationale: string;
-  }) => Promise<void>;
   onCreateAccount: (account: AdAccountProfile) => Promise<void>;
   onCreateAsset: (asset: CreativeAssetProfile) => Promise<void>;
 }) {
@@ -161,33 +148,12 @@ export function DetailDrawer({
     );
   }
 
-  if (drawer.kind === "new_campaign") {
-    return (
-      <NewCampaignDrawer
-        accounts={accounts}
-        busy={busy}
-        onClose={onClose}
-        onSubmit={async (payload) => {
-          setBusy(true);
-          try {
-            await onStageProposal(payload);
-            onClose();
-          } finally {
-            setBusy(false);
-          }
-        }}
-      />
-    );
-  }
-
   return (
     <CampaignDrawer
       campaign={drawer.record}
       accounts={accounts}
       auditEvents={auditEvents}
-      canWrite={canWrite}
       onClose={onClose}
-      onStageProposal={onStageProposal}
     />
   );
 }
@@ -196,60 +162,20 @@ function CampaignDrawer({
   campaign,
   accounts,
   auditEvents,
-  canWrite,
   onClose,
-  onStageProposal,
 }: {
   campaign: StoredRecord<AdCampaignProfile>;
   accounts: readonly StoredRecord<AdAccountProfile>[];
   auditEvents: readonly StoredRecord<AuditEventProfile>[];
-  canWrite: boolean;
   onClose: () => void;
-  onStageProposal: (input: {
-    account: AdAccountProfile;
-    campaign: AdCampaignProfile | null;
-    campaignName: string;
-    actionType: ProposalActionType;
-    newBudgetMinor: number | null;
-    rationale: string;
-  }) => Promise<void>;
 }) {
   const { locale, t } = useLocale();
   const c = campaign.profile;
   const acct =
     accounts.find((a) => a.profile.account_key === c.account_key)?.profile ?? accounts[0]?.profile;
-  const [actionType, setActionType] = useState<ProposalActionType>("budget_update");
-  const [budgetStr, setBudgetStr] = useState(() =>
-    String(Math.round(c.daily_budget_minor / 100) + 200),
-  );
-  const [rationale, setRationale] = useState(
-    "Adjust allocation based on 7-day CPA and pacing headroom.",
-  );
-  const [pending, setPending] = useState(false);
 
   const ctr = c.impressions_7d > 0 ? `${((c.clicks_7d / c.impressions_7d) * 100).toFixed(2)}%` : "—";
   const currency = acct?.currency ?? "HKD";
-
-  const handleStage = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!acct) return;
-    const budgetMinor = actionType === "budget_update" ? parseMajorToMinor(budgetStr) : null;
-    if (actionType === "budget_update" && (!budgetMinor || budgetMinor < 5000)) return;
-    setPending(true);
-    try {
-      await onStageProposal({
-        account: acct,
-        campaign: c,
-        campaignName: c.name,
-        actionType,
-        newBudgetMinor: budgetMinor,
-        rationale: rationale.trim() || "Stage change for owner review.",
-      });
-      onClose();
-    } finally {
-      setPending(false);
-    }
-  };
 
   const tabs = [
     {
@@ -349,77 +275,6 @@ function CampaignDrawer({
           />
         ),
     },
-    ...(canWrite
-      ? [
-          {
-            id: "propose",
-            label: t("Propose Change"),
-            panel: (
-              <form id="ads-propose-form" className="ads-form-grid" onSubmit={handleStage}>
-                <Field label={t("Action")}>
-                  {() => (
-                    <Select
-                      aria-label={t("Action")}
-                      value={actionType}
-                      onChange={(v) => setActionType(v as ProposalActionType)}
-                      options={[
-                        { value: "budget_update", label: t("Update daily budget") },
-                        {
-                          value: c.status === "PAUSED" ? "resume" : "pause",
-                          label: c.status === "PAUSED" ? t("Resume campaign") : t("Pause campaign"),
-                        },
-                      ]}
-                    />
-                  )}
-                </Field>
-                {actionType === "budget_update" && (
-                  <Field
-                    label={`${t("New daily budget")} (${currency})`}
-                    hint={
-                      acct
-                        ? `${t("Daily guardrail:")} ${fmtMoney(acct.daily_guardrail_minor, currency)}`
-                        : undefined
-                    }
-                  >
-                    {({ id, ...ctrl }) => (
-                      <input
-                        id={id}
-                        {...ctrl}
-                        type="number"
-                        min={50}
-                        step={50}
-                        required
-                        className="field num"
-                        value={budgetStr}
-                        onChange={(e) => setBudgetStr(e.target.value)}
-                      />
-                    )}
-                  </Field>
-                )}
-                <Field label={t("Rationale")}>
-                  {({ id, ...ctrl }) => (
-                    <textarea
-                      id={id}
-                      {...ctrl}
-                      rows={3}
-                      required
-                      className="field"
-                      value={rationale}
-                      onChange={(e) => setRationale(e.target.value)}
-                    />
-                  )}
-                </Field>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                  <Button onClick={onClose}>{t("Cancel")}</Button>
-                  <Button type="submit" variant="primary" loading={pending}>
-                    {t("Stage for owner approval")}
-                  </Button>
-                </div>
-              </form>
-            ),
-          },
-        ]
-      : []),
     {
       id: "audit",
       label: t("Audit Log"),
@@ -453,131 +308,6 @@ function CampaignDrawer({
       tabs={tabs}
       onClose={onClose}
       primary={<Button onClick={onClose}>{t("Close")}</Button>}
-    />
-  );
-}
-
-function NewCampaignDrawer({
-  accounts,
-  busy,
-  onClose,
-  onSubmit,
-}: {
-  accounts: readonly StoredRecord<AdAccountProfile>[];
-  busy: boolean;
-  onClose: () => void;
-  onSubmit: (input: {
-    account: AdAccountProfile;
-    campaign: null;
-    campaignName: string;
-    actionType: ProposalActionType;
-    newBudgetMinor: number;
-    rationale: string;
-  }) => Promise<void>;
-}) {
-  const { t } = useLocale();
-  const [accountKey, setAccountKey] = useState(accounts[0]?.profile.account_key ?? "");
-  const [name, setName] = useState("");
-  const [budgetStr, setBudgetStr] = useState("500");
-  const [rationale, setRationale] = useState(
-    "Launch paused campaign for creative QA before owner activation.",
-  );
-  const selectedAccount =
-    accounts.find((a) => a.profile.account_key === accountKey)?.profile ?? accounts[0]?.profile;
-  const currency = selectedAccount?.currency ?? "HKD";
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const account = selectedAccount;
-    const minor = parseMajorToMinor(budgetStr) ?? 50000;
-    if (!account || !name.trim()) return;
-    await onSubmit({
-      account,
-      campaign: null,
-      campaignName: name.trim(),
-      actionType: "create_campaign",
-      newBudgetMinor: minor,
-      rationale: rationale.trim(),
-    });
-  };
-
-  return (
-    <DrawerShell
-      kind={t("New Proposal")}
-      label={t("+ Propose campaign")}
-      title={t("+ Propose campaign")}
-      pills={<StatusPill tone="accent">PAUSED by default</StatusPill>}
-      onClose={onClose}
-      tabs={[
-        {
-          id: "create",
-          label: t("Stage for owner approval"),
-          panel: (
-            <form className="ads-form-grid" onSubmit={handleSubmit}>
-              <Field label={t("Platform & Account")}>
-                {() => (
-                  <Select
-                    aria-label={t("Platform & Account")}
-                    value={accountKey}
-                    onChange={setAccountKey}
-                    options={accounts.map((a) => ({
-                      value: a.profile.account_key,
-                      label: `${a.profile.platform === "meta" ? "Meta Ads" : "Google Ads"} · ${a.profile.external_account_id} (${a.profile.currency})`,
-                    }))}
-                  />
-                )}
-              </Field>
-              <Field label={t("Campaign Name")}>
-                {({ id, ...ctrl }) => (
-                  <input
-                    id={id}
-                    {...ctrl}
-                    required
-                    placeholder="e.g. Spring Search — High Intent"
-                    className="field"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Field label={`${t("New daily budget")} (${currency})`}>
-                {({ id, ...ctrl }) => (
-                  <input
-                    id={id}
-                    {...ctrl}
-                    type="number"
-                    min={50}
-                    step={50}
-                    required
-                    className="field num"
-                    value={budgetStr}
-                    onChange={(e) => setBudgetStr(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Field label={t("Rationale")}>
-                {({ id, ...ctrl }) => (
-                  <textarea
-                    id={id}
-                    {...ctrl}
-                    rows={3}
-                    required
-                    className="field"
-                    value={rationale}
-                    onChange={(e) => setRationale(e.target.value)}
-                  />
-                )}
-              </Field>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                <Button onClick={onClose}>{t("Cancel")}</Button>
-                <Button type="submit" variant="primary" loading={busy}>
-                  {t("Stage for owner approval")}
-                </Button>
-              </div>
-            </form>
-          ),
-        },
-      ]}
     />
   );
 }

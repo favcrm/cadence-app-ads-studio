@@ -1,6 +1,6 @@
-# Ads Studio Query & Canvas Reference
+# Ads Studio Query & Live Tool Reference
 
-All five tables enforce `read_role: "owner"`. All list reads use `records.list` with `limit <= 100`; always follow `next_cursor` until `null` before computing totals.
+All Ads Studio tables enforce `read_role: "owner"`. All list reads use `records.list` with `limit <= 100`; always follow `next_cursor` until `null` before computing totals.
 
 ## Tables and fields
 
@@ -27,23 +27,20 @@ All five tables enforce `read_role: "owner"`. All list reads use `records.list` 
 - Never combine `meta_actions_json` action types with each other or with `google_conversions`. Report Meta `purchase`, `lead`, or other action types on separate lines.
 - Default outlier threshold in domain logic: `cpa_minor > 18000` (`HK$180.00`). Flag `status: "LIMITED"` campaigns alongside CPA outliers.
 
-### 3. `ad_proposals`
-- Keys & fields: `proposal_key` (immutable), `account_key`, `campaign_key` (nullable), `campaign_name`, `platform`, `tool_slug`, `action_type` (`budget_update` | `pause` | `resume` | `create_campaign`), `before_label`, `after_label`, `new_budget_minor` (nullable integer), `rationale`, `proposed_by`, `proposed_at`, `status` (`pending` | `applied` | `rejected`), `action_id_hex`
-- Example pending-queue read:
-```json
-{
-  "table": "ad_proposals",
-  "limit": 100,
-  "filters": [{ "field": "status", "op": "eq", "value": "pending" }]
-}
-```
-
-### 4. `audit_events` (`append_only: true`)
+### 3. `audit_events` (`append_only: true`)
 - Fields: `event_key` (immutable), `kind` (`sync` | `proposal` | `alert` | `approval`), `summary`, `summary_zh` (nullable), `occurred_at`
 - Example read:
 ```json
 { "table": "audit_events", "limit": 100, "order_by": { "field": "occurred_at", "direction": "desc" } }
 ```
+
+*(Note: legacy `ad_proposals` rows may exist on upgraded workspaces for compatibility; live approvals belong in Cadence Home `pending_actions` rather than `ad_proposals`.)*
+
+## Live Connected Read Tools (`effect: "read"`)
+
+Discover connected tools via `find_tools` (UI), `connected_tools_list` (MCP), or `cadence --org <org> platform connected-tools` (CLI):
+- **Meta Ads:** `meta_ads_list_accounts`, `meta_ads_list_campaigns`, `meta_ads_list_adsets`, `meta_ads_list_ads`, `meta_ads_list_creatives`, `meta_ads_get_insights` (supports `level: "campaign" | "adset" | "ad"` and projects `action_types`, `action_counts`, `action_value_types`, `action_value_amounts`).
+- **Google Ads:** `google_ads_list_accounts`, `google_ads_list_campaigns`, `google_ads_list_ad_groups`, `google_ads_search_terms` (GAQL against `ad_group` and `search_term_view`).
 
 ## Opening Ads Studio on screen (`canvas_open`)
 
@@ -51,7 +48,6 @@ Declared navigation sections and views in `screens/ads-studio/screens.json`:
 - `overview` — 7-day summary cards, channel conversion split, spend pacing vs guardrails (`params`: `range` `7d|30d|month`, `platform` `all|meta|google`)
 - `campaigns` / `campaign_audit` — campaign table with filters and ad-set drawer (`params`: `range`, `platform`, `status` `all|ACTIVE|PAUSED|LIMITED`, `q`)
 - `campaign` — opens the campaign detail drawer for `id` (`section: "campaigns"`, `params`: `id`)
-- `proposals` — staged changes awaiting owner approval
 - `creatives` — Workspace Media asset pointers and copy specs
 - `accounts` — Meta/Google account connections and daily guardrails
 

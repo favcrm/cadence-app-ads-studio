@@ -9,7 +9,7 @@ execution in the Cadence host.
 - Store money strictly as integer minor units (`*_minor`) paired with `currency`.
 - Keep Meta conversion action types split cleanly (`meta_actions_json`); never sum incompatible Meta action types together or merge them ambiguously with Google conversions.
 - Never store binary image/video blobs inside `app-storage/v1`. Store metadata + Workspace Files (`wiki_path`, `sha256`, `size_bytes`) pointers in `creative_assets` (`15 MiB` hosted `WIKI_UPLOAD_MAX` vs `100 MB` native `MAX_UPLOAD_BYTES`).
-- Every write staged by the assistant or screen goes to `ad_proposals` and only applies to campaign state + `audit_events` once an owner confirms.
+- Live external spend and status mutations stage through Cadence Home (`connected_effect` / `pending_actions`) for single-step owner approval; do not stage duplicate shadow rows into `ad_proposals` (retained in `001-initial.json` for schema compatibility only).
 - In read-only `Chat Canvas` (`screen-canvas.v1`), hide all write/mutation UI and honour incoming `screen-route-params.v1` route parameters (`p.range`, `p.platform`, `p.status`).
 - Every UI string goes through `useLocale().t` and must have an entry in `src/features/ads/localeCatalog.ts` for `"zh-TW"` (rendered as written zh-HK).
 - Once a migration under `app/storage/` is released, treat it as append-only immutable history and append a new numbered migration instead.

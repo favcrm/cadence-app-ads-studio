@@ -93,7 +93,6 @@ const expectedNavigation = {
   sections: [
     { id: "overview", label: "Overview", i18n: { "zh-TW": { label: "總覽" } } },
     { id: "campaigns", label: "Campaigns", i18n: { "zh-TW": { label: "廣告活動" } } },
-    { id: "proposals", label: "Changes", i18n: { "zh-TW": { label: "變更提案" } } },
     { id: "creatives", label: "Creatives", i18n: { "zh-TW": { label: "廣告素材" } } },
     { id: "accounts", label: "Accounts", i18n: { "zh-TW": { label: "帳號與連線" } } },
   ],

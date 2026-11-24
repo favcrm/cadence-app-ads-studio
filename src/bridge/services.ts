@@ -4,7 +4,7 @@ import { channel } from "./channel";
 
 type Bag = Record<string, unknown>;
 
-export const SECTIONS = ["overview", "campaigns", "proposals", "creatives", "accounts"] as const;
+export const SECTIONS = ["overview", "campaigns", "creatives", "accounts"] as const;
 export type Section = (typeof SECTIONS)[number];
 
 export type FilterValue = string | number | boolean;
